@@ -37,7 +37,8 @@
     "satellite": "Sentinel-2",
     "pre_fire_days": 90,
     "post_fire_days": 30,
-    "scale": 100
+    "scale": 100,
+    "dnbr_threshold": 0.2
   },
   "severity_layer": {
     "opacity": 0.85

@@ -258,6 +258,26 @@ workflow:
       title: Mean dNBR
       data: ${{ workflow.mean_dnbr_fmt.return }}
 
+  # --- Stat: dNBR detection threshold used ------------------------------------
+  - name: dNBR Threshold
+    id: threshold_result
+    task: get_dnbr_threshold
+    partial:
+      geodataframe: ${{ workflow.severity_result.return }}
+
+  - name: dNBR Threshold Formatted
+    id: threshold_fmt
+    task: format_dnbr_threshold
+    partial:
+      threshold: ${{ workflow.threshold_result.return }}
+
+  - name: Widget - Threshold
+    id: widget_threshold
+    task: create_text_widget_single_view
+    partial:
+      title: Threshold
+      data: ${{ workflow.threshold_fmt.return }}
+
   # --- Stat: pre/post scene counts (trust indicators) -------------------------
   - name: Pre Scenes
     id: pre_scenes
@@ -298,9 +318,9 @@ workflow:
       data: ${{ workflow.post_scenes_fmt.return }}
 
   # --- Dashboard --------------------------------------------------------------
-  # Row 1 (y=0): 0=Burned, 1=High Sev, 2=% Burned
-  # Row 2 (y=3): 3=Mean dNBR, 4=Pre Imgs, 5=Post Imgs
-  # Row 3 (y=6): 6=Map
+  # Row 1 (y=0): 0=Burned, 1=High Sev, 2=% Burned, 3=Threshold
+  # Row 2 (y=3): 4=Mean dNBR, 5=Pre Imgs, 6=Post Imgs
+  # Row 3 (y=6): 7=Map
   - name: Dashboard
     id: dashboard
     task: gather_dashboard
@@ -310,6 +330,7 @@ workflow:
         - ${{ workflow.widget_burned.return }}
         - ${{ workflow.widget_high_severity.return }}
         - ${{ workflow.widget_percent_burned.return }}
+        - ${{ workflow.widget_threshold.return }}
         - ${{ workflow.widget_mean_dnbr.return }}
         - ${{ workflow.widget_pre_scenes.return }}
         - ${{ workflow.widget_post_scenes.return }}

@@ -16,10 +16,12 @@ from dnbr_severity_tasks import (
     create_styled_overlay_layer as create_styled_overlay_layer,
 )
 from dnbr_severity_tasks import format_area_ha as format_area_ha
+from dnbr_severity_tasks import format_dnbr_threshold as format_dnbr_threshold
 from dnbr_severity_tasks import format_image_count as format_image_count
 from dnbr_severity_tasks import format_mean_dnbr as format_mean_dnbr
 from dnbr_severity_tasks import format_percent_burned as format_percent_burned
 from dnbr_severity_tasks import get_aoi_area_ha as get_aoi_area_ha
+from dnbr_severity_tasks import get_dnbr_threshold as get_dnbr_threshold
 from dnbr_severity_tasks import get_percent_burned as get_percent_burned
 from dnbr_severity_tasks import set_aoi_group_name as set_aoi_group_name
 from dnbr_severity_tasks import set_overlay_group_name as set_overlay_group_name
@@ -629,6 +631,61 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
         .call()
     )
 
+    threshold_result = (
+        task(get_dnbr_threshold)
+        .validate()
+        .set_task_instance_id("threshold_result")
+        .handle_errors()
+        .with_tracing()
+        .skipif(
+            conditions=[
+                any_is_empty_df,
+                any_dependency_skipped,
+            ],
+            unpack_depth=1,
+        )
+        .partial(geodataframe=severity_result, **(params.get("threshold_result") or {}))
+        .call()
+    )
+
+    threshold_fmt = (
+        task(format_dnbr_threshold)
+        .validate()
+        .set_task_instance_id("threshold_fmt")
+        .handle_errors()
+        .with_tracing()
+        .skipif(
+            conditions=[
+                any_is_empty_df,
+                any_dependency_skipped,
+            ],
+            unpack_depth=1,
+        )
+        .partial(threshold=threshold_result, **(params.get("threshold_fmt") or {}))
+        .call()
+    )
+
+    widget_threshold = (
+        task(create_text_widget_single_view)
+        .validate()
+        .set_task_instance_id("widget_threshold")
+        .handle_errors()
+        .with_tracing()
+        .skipif(
+            conditions=[
+                any_is_empty_df,
+                any_dependency_skipped,
+            ],
+            unpack_depth=1,
+        )
+        .partial(
+            title="Threshold",
+            data=threshold_fmt,
+            **(params.get("widget_threshold") or {}),
+        )
+        .call()
+    )
+
     pre_scenes = (
         task(count_pre_images)
         .validate()
@@ -758,6 +815,7 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
                 widget_burned,
                 widget_high_severity,
                 widget_percent_burned,
+                widget_threshold,
                 widget_mean_dnbr,
                 widget_pre_scenes,
                 widget_post_scenes,

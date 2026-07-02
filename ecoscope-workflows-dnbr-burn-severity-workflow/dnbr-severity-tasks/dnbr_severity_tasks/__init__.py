@@ -275,6 +275,23 @@ def compute_dnbr_severity(
             le=500,
         ),
     ] = 100,
+    dnbr_threshold: Annotated[
+        float,
+        Field(
+            title="dNBR Detection Threshold",
+            description=(
+                "Minimum dNBR for a pixel to count as burned at all (independent of the "
+                "Key & Benson severity colour it's given once detected). Default 0.20. "
+                "0.10 (the floor) detects the most area but is highly prone to false positives "
+                "from ordinary seasonal vegetation drying — especially over a scan window of "
+                "weeks or months rather than a specific known fire date. Raise to 0.27-0.30 if "
+                "a run shows a large, diffuse, low-severity 'burn' across most of the AOI: real "
+                "fire scars are spatially coherent and rarely uniform across an entire reserve."
+            ),
+            ge=0.10,
+            le=0.5,
+        ),
+    ] = 0.20,
 ) -> _GDF:
     """
     Compute a per-class dNBR burn-severity map across the AOI for the fire window.
@@ -284,13 +301,24 @@ def compute_dnbr_severity(
         MIRBI  = 10·SWIR2 − 9.8·SWIR1 + 2               (Trigg & Flasse 2001)
         ΔMIRBI = MIRBI_post − MIRBI_pre                 positive ⇒ burn (opposite sign to dNBR)
 
-    Every pixel is classified into a Key & Benson severity class. Pixels of class
-    Low or higher are vectorised into per-class polygons (scales to reserve size),
-    each tagged 'confirmed' (ΔMIRBI also indicates burn) or 'probable'.
+    Detection and classification are deliberately decoupled: `dnbr_threshold` gates
+    whether a pixel counts as burned at all (a locally-tunable operational decision —
+    Key & Benson themselves note the fixed classes need biome calibration), while the
+    colour/class it receives once detected always follows the unmodified Key & Benson
+    bins. This keeps severity comparisons standard even when the detection floor is
+    raised for a noisy AOI.
+
+    NOTE: ΔMIRBI confirmation reduces false positives from clouds/shadow/water, but does
+    NOT reliably separate real fire from seasonal grass senescence — both processes
+    reduce vegetation moisture and shift the SWIR bands the same way. A high 'confirmed'
+    rate is not on its own proof of a real burn; treat it as a secondary signal only.
+
+    A minimum patch size of 0.5 ha (connected-pixel filter, Roteta et al. 2019) removes
+    single-pixel speckle before vectorisation.
 
     Returns a GeoDataFrame with one row per burned polygon:
         severity_class, severity_index (0..5), dNBR (mean), DELTA_MIRBI (mean),
-        confidence, fill_color, fill_color_hex, area_ha, satellite,
+        confidence, fill_color, fill_color_hex, area_ha, satellite, dnbr_threshold,
         pre_image_count, post_image_count, aoi_area_ha, fire_start_date, fire_end_date.
     """
     import ee
@@ -352,6 +380,8 @@ def compute_dnbr_severity(
 
     # Severity index image, 0..5, built by summing threshold crossings:
     #   <-100→0, -100..100→1, 100..270→2, 270..440→3, 440..660→4, ≥660→5
+    # This is always the unmodified Key & Benson classification, regardless of
+    # dnbr_threshold — only which pixels get THROUGH to the map depends on the threshold.
     sev = (
         dnbr.gte(-100)
         .add(dnbr.gte(100))
@@ -362,8 +392,20 @@ def compute_dnbr_severity(
         .rename("severity_index")
     )
 
-    # Keep only burned classes (Low and higher, index ≥ 2) for the map.
-    burned_label = sev.updateMask(sev.gte(2))
+    # Detection gate: dNBR ≥ threshold (independent of the Key & Benson colour above).
+    # Floored at 0.10 (Field ge=0.10) so a pixel that passes the gate can never fall in
+    # the Unburned band (-100..100) — avoids a "burned but labelled Unburned" contradiction.
+    threshold_scaled = dnbr_threshold * 1000
+    burned_bool = dnbr.gte(threshold_scaled).selfMask()
+
+    # Minimum patch size: 0.5 ha connected-component filter (Roteta et al. 2019) —
+    # removes single/speckled pixels so noise doesn't get individually vectorised.
+    pixel_area_m2 = scale ** 2
+    min_pixels = max(1, int(np.ceil(5000.0 / pixel_area_m2)))  # 0.5 ha = 5000 m²
+    connected = burned_bool.connectedPixelCount(maxSize=1000, eightConnected=True)
+    patch_mask = connected.gte(min_pixels)
+
+    burned_label = sev.updateMask(patch_mask)
     polys = burned_label.reduceToVectors(
         geometry=roi_geom,
         scale=scale,
@@ -387,7 +429,7 @@ def compute_dnbr_severity(
     _cols = [
         "geometry", "severity_class", "severity_index", "dNBR", "DELTA_MIRBI",
         "confidence", "fill_color", "fill_color_hex", "area_ha", "satellite",
-        "pre_image_count", "post_image_count", "aoi_area_ha",
+        "dnbr_threshold", "pre_image_count", "post_image_count", "aoi_area_ha",
         "fire_start_date", "fire_end_date",
     ]
     if not features:
@@ -419,6 +461,7 @@ def compute_dnbr_severity(
 
     # Run metadata (stored per row so stat tasks can read it back).
     gdf["satellite"]        = satellite
+    gdf["dnbr_threshold"]   = dnbr_threshold
     gdf["pre_image_count"]  = pre_count
     gdf["post_image_count"] = post_count
     gdf["aoi_area_ha"]      = area_m2 / 10_000.0
@@ -649,6 +692,22 @@ def format_image_count(
 ) -> str:
     """Format a scene count as 'N scene(s)'."""
     return f"{count} scene{'s' if count != 1 else ''}"
+
+
+@register(tags=["fire", "stats"])
+def get_dnbr_threshold(geodataframe: _GDF) -> float:
+    """Extract the dNBR detection threshold used in this run."""
+    if geodataframe.empty or "dnbr_threshold" not in geodataframe.columns:
+        return 0.0
+    return float(geodataframe["dnbr_threshold"].iloc[0])
+
+
+@register(tags=["fire", "stats"])
+def format_dnbr_threshold(
+    threshold: Annotated[float, Field(description="dNBR threshold value.")],
+) -> str:
+    """Format the dNBR threshold for display (e.g. '0.20')."""
+    return f"{threshold:.2f}"
 
 
 @register(tags=["fire", "stats"])

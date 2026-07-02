@@ -340,6 +340,14 @@
           "title": "Analysis Scale (metres)",
           "type": "integer",
           "description": "Pixel resolution for the analysis. 100 m (default) works for reserves up to ~500,000 ha. Use 20-50 m for small areas (< 5,000 ha) where detail matters. Finer scales over large areas exceed Earth Engine memory limits."
+        },
+        "dnbr_threshold": {
+          "default": 0.2,
+          "maximum": 0.5,
+          "minimum": 0.1,
+          "title": "dNBR Detection Threshold",
+          "type": "number",
+          "description": "Minimum dNBR for a pixel to count as burned at all (independent of the Key & Benson severity colour it's given once detected). Default 0.20. 0.10 (the floor) detects the most area but is highly prone to false positives from ordinary seasonal vegetation drying \u2014 especially over a scan window of weeks or months rather than a specific known fire date. Raise to 0.27-0.30 if a run shows a large, diffuse, low-severity 'burn' across most of the AOI: real fire scars are spatially coherent and rarely uniform across an entire reserve."
         }
       },
       "required": [
@@ -429,7 +437,8 @@
         "satellite",
         "pre_fire_days",
         "post_fire_days",
-        "scale"
+        "scale",
+        "dnbr_threshold"
       ]
     },
     "ui:order": [
