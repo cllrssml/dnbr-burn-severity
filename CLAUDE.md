@@ -141,9 +141,16 @@ area did not actually burn.
 rather than a calendar month; a uniform reserve-wide "Low" wash is diagnostic of seasonal
 drying, not fire; raise `dnbr_threshold` toward 0.27-0.30 when that pattern appears.
 
+## GitHub
+
+Repo: https://github.com/cllrssml/dnbr-burn-severity (public, pushed 2026-07-02).
+Org/reserve identity redacted from all tracked files before publishing (only the generic
+`/home/sam/Ecoscope_Projects/...` dev path remains, matching the precedent already public
+in sibling repos `fire-severity-dnbr` and `burn-scar-mapping`).
+
 ## Next steps before handing to Britt
 
 - Re-run against the same reserve/month with the new `dnbr_threshold` field at 0.20 and
   at ~0.28 to confirm the false-positive area drops while the 8 real-looking patches survive.
 - If possible, also re-run with a narrower, real fire-date window instead of a calendar month.
-- Then publish repo `cllrssml/dnbr-burn-severity` and share with Britt.
+- Then share the published repo URL with Britt.
