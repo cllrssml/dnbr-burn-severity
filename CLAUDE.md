@@ -75,6 +75,38 @@ also accepts optional `controlled_burn_layer`/`firms_layer`) →
 stat chain: burned_area → high_severity → (aoi_area → percent_burned) → threshold → mean_dnbr → pre_scenes → post_scenes →
 `gather_dashboard` (`time_range: ~`).
 
+### Tooltips, legend, area, and consistent hectares — v3.1.0, added 2026-07-02
+
+- **Tooltips on the ER event overlays.** `create_styled_overlay_layer` gained
+  `tooltip_columns` and `legend_label` params (both explicitly bound to `[]`/`~` for
+  `aoi_layer`/`overlay_layer` so they stay hidden — same discipline as every other
+  param added to this task). Controlled Burn shows title/time/area_ha on hover; FIRMS
+  shows title/time (points have no area).
+- **Area for controlled-burn polygons.** New task `add_polygon_area_ha` (UTM
+  reprojection, same technique `compute_dnbr_severity` already uses for the severity
+  polygons) adds `area_ha` for polygon/multipolygon rows only — NaN for points/lines,
+  since area isn't a meaningful concept for a FIRMS point detection. Wired as its own
+  step between `get_events` and `create_styled_overlay_layer` for the controlled-burn
+  branch only.
+- **One shared legend, not per-layer boxes.** Confirmed from `draw_ecomap` source:
+  every `LayerDefinition.legend` in `geo_layers` gets flattened into a single
+  `m.add_legend()` call — so a legend entry added to `controlled_burn_layer`/
+  `firms_layer` merges into the same panel as the severity classes, not a second box.
+  `legend_label` is attached to only the first non-empty geometry-type sub-layer a
+  gdf produces, so a mixed-geometry input still yields one swatch, not one per type.
+  Renamed the shared `legend_style.title` from "Burn Severity" to "Legend" since the
+  panel can now contain non-severity entries too.
+- **AOI boundary vs. free-text overlay were both `#FF8C00`** — indistinguishable on
+  the map when both were in use. AOI Boundary is now `#000000` (black, standard
+  cartographic convention for a boundary outline); Overlay Layer stays `#FF8C00`
+  (unchanged, matches pre-existing behaviour for anyone already using that field).
+- **All areas now consistently hectares.** `format_area_ha` previously switched units
+  by magnitude (m² below 1 ha, km² above 10,000 ha) — removed; it's `ha` always
+  (1 decimal below 100 ha, whole numbers at/above). Per-polygon `area_ha` on the
+  severity result is now rounded to 1 decimal at the source in `compute_dnbr_severity`
+  rather than left as a raw float, so both the map tooltip and the stat widgets that
+  sum it show clean, consistent numbers.
+
 ### Form simplification — v3.0.0, added 2026-07-02
 
 v2.0.0 accidentally exposed a wall of technical fields alongside the two event-type

@@ -132,6 +132,16 @@ workflow:
       include_display_values: false
       force_point_geometry: false
 
+  - name: Controlled Burn Area
+    id: controlled_burn_area
+    task: add_polygon_area_ha
+    skipif:
+      conditions:
+        - any_dependency_skipped
+        - any_is_empty_df
+    partial:
+      geodataframe: ${{ workflow.controlled_burn_events.return }}
+
   - name: Controlled Burn Layer
     id: controlled_burn_layer
     task: create_styled_overlay_layer
@@ -140,9 +150,14 @@ workflow:
         - any_dependency_skipped
         - any_is_empty_df
     partial:
-      geodataframe: ${{ workflow.controlled_burn_events.return }}
+      geodataframe: ${{ workflow.controlled_burn_area.return }}
       zoom: false
       color: "#1E90FF"
+      tooltip_columns:
+        - title
+        - time
+        - area_ha
+      legend_label: "Controlled Burn"
 
   # --- Optional: FIRMS detections (visual reference only) ----------------------
   - name: FIRMS Event Type
@@ -185,6 +200,10 @@ workflow:
       geodataframe: ${{ workflow.firms_events.return }}
       zoom: false
       color: "#FF00FF"
+      tooltip_columns:
+        - title
+        - time
+      legend_label: "FIRMS Detection"
 
   # --- dNBR severity computation (GEE) ----------------------------------------
   - name: Compute Severity
@@ -210,7 +229,9 @@ workflow:
     partial:
       geodataframe: ${{ workflow.aoi_features.return }}
       zoom: true
-      color: "#FF8C00"
+      color: "#000000"
+      tooltip_columns: []
+      legend_label: ~
 
   # --- Optional user overlay --------------------------------------------------
   - name: Overlay Layer
@@ -224,6 +245,8 @@ workflow:
       geodataframe: ${{ workflow.overlay_features.return }}
       zoom: false
       color: "#FF8C00"
+      tooltip_columns: []
+      legend_label: ~
 
   # --- Combine layers: severity + AOI boundary + optional overlay -------------
   # skipif: any_is_empty_df ONLY — task handles SkipSentinel from overlay_layer
@@ -256,7 +279,7 @@ workflow:
       north_arrow_style:
         placement: top-left
       legend_style:
-        title: Burn Severity
+        title: Legend
         placement: bottom-right
       static: false
       max_zoom: 20

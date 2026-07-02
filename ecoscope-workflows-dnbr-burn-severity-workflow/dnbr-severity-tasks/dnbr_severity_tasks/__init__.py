@@ -557,7 +557,7 @@ def compute_dnbr_severity(
     gdf["DELTA_MIRBI"] = gdf["DELTA_MIRBI"].fillna(0.0)
     gdf["confidence"] = gdf["DELTA_MIRBI"].apply(lambda v: "confirmed" if v > 0 else "probable")
 
-    gdf["area_ha"] = gdf.to_crs(gdf.estimate_utm_crs()).geometry.area / 10_000.0
+    gdf["area_ha"] = (gdf.to_crs(gdf.estimate_utm_crs()).geometry.area / 10_000.0).round(1)
 
     # Run metadata (stored per row so stat tasks can read it back).
     gdf["satellite"]        = satellite
@@ -623,15 +623,26 @@ def create_styled_overlay_layer(
         str,
         Field(default="#FF8C00", description="Hex colour for this layer's lines/outlines/points."),
     ] = "#FF8C00",
+    tooltip_columns: Annotated[
+        list[str],
+        Field(default=[], description="Columns to show in the map tooltip when hovering a feature."),
+    ] = [],
+    legend_label: Annotated[
+        str | None,
+        Field(default=None, description="If set, adds a single-colour legend entry with this label."),
+    ] = None,
 ) -> Any:
     """
     Overlay layer for ER spatial features (AOI boundary, roads, fencelines, etc.) or
     ER events (controlled burns, FIRMS detections).
 
-    Splits by geometry type so lonboard never receives mixed types.
+    Splits by geometry type so lonboard never receives mixed types. The legend entry
+    (if any) is attached to only the first non-empty sub-layer, so a mixed-geometry
+    input still produces one legend swatch, not one per geometry type.
     """
     from ecoscope.platform.tasks.results._ecomap import (
         LayerDefinition,
+        LegendDefinition,
         PointLayerStyle,
         PolygonLayerStyle,
         PolylineLayerStyle,
@@ -641,14 +652,24 @@ def create_styled_overlay_layer(
     geom_col = gdf.geometry.geom_type
     width = 2.0
     layers = []
+    legend = LegendDefinition(labels=[legend_label], colors=[color]) if legend_label else None
+
+    def _next_legend():
+        # Attach the legend to only the first sub-layer that gets built.
+        nonlocal legend
+        out, legend = legend, None
+        return out
+
+    def _cols(g):
+        return [c for c in tooltip_columns if c in g.columns]
 
     line_gdf = gdf[geom_col.isin({"LineString", "MultiLineString"})].copy()
     if not line_gdf.empty:
         layers.append(LayerDefinition(
             geodataframe=line_gdf,
             layer_style=PolylineLayerStyle(get_color=color, get_width=width, width_units="pixels", cap_rounded=True),
-            legend=None,
-            tooltip_columns=[],
+            legend=_next_legend(),
+            tooltip_columns=_cols(line_gdf),
             zoom=zoom,
         ))
 
@@ -660,8 +681,8 @@ def create_styled_overlay_layer(
                 filled=False, stroked=True,
                 get_line_color=color, get_line_width=width, line_width_units="pixels",
             ),
-            legend=None,
-            tooltip_columns=[],
+            legend=_next_legend(),
+            tooltip_columns=_cols(polygon_gdf),
             zoom=zoom,
         ))
 
@@ -670,12 +691,32 @@ def create_styled_overlay_layer(
         layers.append(LayerDefinition(
             geodataframe=point_gdf,
             layer_style=PointLayerStyle(get_fill_color=color, get_radius=5, radius_units="pixels"),
-            legend=None,
-            tooltip_columns=[],
+            legend=_next_legend(),
+            tooltip_columns=_cols(point_gdf),
             zoom=zoom,
         ))
 
     return layers
+
+
+@register(tags=["fire", "overlay"])
+def add_polygon_area_ha(geodataframe: _GDF) -> _GDF:
+    """
+    Add an `area_ha` column (rounded to 1 decimal) for polygon/multipolygon rows —
+    e.g. the footprint of a recorded controlled burn. Non-polygon rows (points, lines)
+    get NaN; area is not a meaningful concept for a point detection.
+    """
+    gdf = geodataframe.copy()
+    if gdf.empty:
+        gdf["area_ha"] = []
+        return gdf
+    gdf["area_ha"] = np.nan
+    is_poly = gdf.geometry.geom_type.isin({"Polygon", "MultiPolygon"})
+    if is_poly.any():
+        poly_gdf = gdf.loc[is_poly]
+        utm = poly_gdf.to_crs(poly_gdf.estimate_utm_crs())
+        gdf.loc[is_poly, "area_ha"] = (utm.geometry.area / 10_000.0).round(1).values
+    return gdf
 
 
 @register(tags=["fire"])
@@ -822,12 +863,11 @@ def format_dnbr_threshold(
 def format_area_ha(
     area_ha: Annotated[float, Field(description="Area in hectares to format for display.")],
 ) -> str:
-    """Format an area value as a human-readable string (m², ha, or km²)."""
+    """Format an area value for display — always hectares, never km²/m², so every
+    area shown on the dashboard uses one consistent unit."""
     if area_ha <= 0:
         return "0 ha"
-    elif area_ha >= 10_000:
-        return f"{area_ha / 10_000:.1f} km²"
-    elif area_ha >= 1:
+    elif area_ha >= 100:
         return f"{int(round(area_ha)):,} ha"
     else:
-        return f"{int(round(area_ha * 10_000)):,} m²"
+        return f"{area_ha:.1f} ha"

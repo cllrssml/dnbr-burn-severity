@@ -2,6 +2,7 @@
 import os
 from typing import Any
 
+from dnbr_severity_tasks import add_polygon_area_ha as add_polygon_area_ha
 from dnbr_severity_tasks import combine_severity_layers as combine_severity_layers
 from dnbr_severity_tasks import compute_dnbr_severity as compute_dnbr_severity
 from dnbr_severity_tasks import count_burned_area_ha as count_burned_area_ha
@@ -351,6 +352,26 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
         .call()
     )
 
+    controlled_burn_area = (
+        task(add_polygon_area_ha)
+        .validate()
+        .set_task_instance_id("controlled_burn_area")
+        .handle_errors()
+        .with_tracing()
+        .skipif(
+            conditions=[
+                any_dependency_skipped,
+                any_is_empty_df,
+            ],
+            unpack_depth=1,
+        )
+        .partial(
+            geodataframe=controlled_burn_events,
+            **(params.get("controlled_burn_area") or {}),
+        )
+        .call()
+    )
+
     controlled_burn_layer = (
         task(create_styled_overlay_layer)
         .validate()
@@ -365,9 +386,11 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
             unpack_depth=1,
         )
         .partial(
-            geodataframe=controlled_burn_events,
+            geodataframe=controlled_burn_area,
             zoom=False,
             color="#1E90FF",
+            tooltip_columns=["title", "time", "area_ha"],
+            legend_label="Controlled Burn",
             **(params.get("controlled_burn_layer") or {}),
         )
         .call()
@@ -436,6 +459,8 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
             geodataframe=firms_events,
             zoom=False,
             color="#FF00FF",
+            tooltip_columns=["title", "time"],
+            legend_label="FIRMS Detection",
             **(params.get("firms_layer") or {}),
         )
         .call()
@@ -497,7 +522,9 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
         .partial(
             geodataframe=aoi_features,
             zoom=True,
-            color="#FF8C00",
+            color="#000000",
+            tooltip_columns=[],
+            legend_label=None,
             **(params.get("aoi_layer") or {}),
         )
         .call()
@@ -520,6 +547,8 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
             geodataframe=overlay_features,
             zoom=False,
             color="#FF8C00",
+            tooltip_columns=[],
+            legend_label=None,
             **(params.get("overlay_layer") or {}),
         )
         .call()
@@ -566,7 +595,7 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
             tile_layers=base_maps,
             geo_layers=combined_layers,
             north_arrow_style={"placement": "top-left"},
-            legend_style={"title": "Burn Severity", "placement": "bottom-right"},
+            legend_style={"title": "Legend", "placement": "bottom-right"},
             static=False,
             max_zoom=20,
             **(params.get("severity_map") or {}),
