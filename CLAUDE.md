@@ -103,9 +103,9 @@ Compiled clean at v1.0.0; `pixi install` lock includes win-64; task module impor
 schema correct (satellite dropdown, two required dates, dnbr_threshold field verified
 0.10-0.50/default 0.20, client/aoi hidden). Pure-Python logic unit-tested (severity index
 at all boundaries, stat tasks, empty-GDF guards, threshold formatter/getter, patch-size
-math, threshold-floor consistency). **First live Desktop run completed** on a real CFW
-reserve — see incident below. `--mock-io` still hangs in the headless sandbox (blocks on
-GEE init), not a workflow defect — real runs must happen in Desktop.
+math, threshold-floor consistency). **First live Desktop run completed** on a real reserve
+— see incident below. `--mock-io` still hangs in the headless sandbox (blocks on GEE init),
+not a workflow defect — real runs must happen in Desktop.
 
 ## Incident: first Desktop run showed 73.5% of reserve "burned" (false positive)
 
