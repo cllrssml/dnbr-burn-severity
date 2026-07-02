@@ -486,6 +486,12 @@ workflow:
         - column: area_ha
           agg_func: sum
           label: "Area (ha)"
+      layout_kwargs:
+        showlegend: false
+        xaxis:
+          title: "Severity Class"
+        yaxis:
+          title: "Area (ha)"
 
   - name: Persist Severity Area Chart
     id: severity_area_chart_url
@@ -519,6 +525,12 @@ workflow:
         - column: dNBR
           agg_func: count
           label: "Polygon Count"
+      layout_kwargs:
+        showlegend: false
+        xaxis:
+          title: "dNBR (bin start)"
+        yaxis:
+          title: "Polygon Count"
 
   - name: Persist dNBR Histogram
     id: dnbr_histogram_url

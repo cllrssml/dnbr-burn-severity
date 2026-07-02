@@ -1170,6 +1170,11 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
             bar_chart_configs=[
                 {"column": "area_ha", "agg_func": "sum", "label": "Area (ha)"}
             ],
+            layout_kwargs={
+                "showlegend": False,
+                "xaxis": {"title": "Severity Class"},
+                "yaxis": {"title": "Area (ha)"},
+            },
             **(params.get("severity_area_chart") or {}),
         )
         .call()
@@ -1256,6 +1261,11 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
             bar_chart_configs=[
                 {"column": "dNBR", "agg_func": "count", "label": "Polygon Count"}
             ],
+            layout_kwargs={
+                "showlegend": False,
+                "xaxis": {"title": "dNBR (bin start)"},
+                "yaxis": {"title": "Polygon Count"},
+            },
             **(params.get("dnbr_histogram") or {}),
         )
         .call()

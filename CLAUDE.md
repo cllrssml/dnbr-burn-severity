@@ -75,6 +75,15 @@ also accepts optional `controlled_burn_layer`/`firms_layer`) →
 stat chain: burned_area → high_severity → (aoi_area → percent_burned) → threshold → mean_dnbr → pre_scenes → post_scenes →
 `gather_dashboard` (`time_range: ~`).
 
+### Hide chart layout_kwargs — v5.0.0, added 2026-07-02
+
+The "Severity Area Chart" and "dNBR Histogram" sections (each exposing a single
+optional `layout_kwargs`/`LayoutStyle` field) got the same treatment as every other
+technical field removed in v3.0.0 — bound via `partial:` instead of left open, with
+sensible fixed values (`showlegend: false`, axis titles) rather than asking the user.
+Both sections now disappear entirely from the form, same mechanism as everywhere else
+in this workflow: a step with zero unbound params doesn't render.
+
 ### Two dashboard charts — v4.0.0, added 2026-07-02
 
 Added the two charts recommended when scoping this out: "Burned Area by Severity
