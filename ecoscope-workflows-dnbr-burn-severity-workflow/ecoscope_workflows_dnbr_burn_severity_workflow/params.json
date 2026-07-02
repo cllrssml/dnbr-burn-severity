@@ -306,31 +306,6 @@
       "type": "object",
       "title": "Fire End Date"
     },
-    "fire_time_range": {
-      "additionalProperties": false,
-      "properties": {
-        "timezone": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/TimezoneInfo"
-            }
-          ],
-          "default": null,
-          "title": "Timezone"
-        },
-        "time_format": {
-          "default": "%d %b %Y %H:%M:%S",
-          "title": "Time Format",
-          "type": "string",
-          "description": "The time format",
-          "ecoscope:advanced": true
-        }
-      },
-      "required": [],
-      "type": "object",
-      "description": "Choose the period of time to analyze.",
-      "title": "Fire Time Range"
-    },
     "controlled_burn_event_type": {
       "additionalProperties": false,
       "properties": {
@@ -345,108 +320,6 @@
       "required": [],
       "title": "Controlled Burn Event Type"
     },
-    "controlled_burn_events": {
-      "additionalProperties": false,
-      "properties": {
-        "event_columns": {
-          "default": [
-            "id",
-            "time",
-            "event_type",
-            "event_category",
-            "title",
-            "reported_by",
-            "created_at",
-            "serial_number",
-            "is_collection",
-            "event_details",
-            "geometry"
-          ],
-          "items": {
-            "enum": [
-              "id",
-              "location",
-              "time",
-              "end_time",
-              "message",
-              "provenance",
-              "event_type",
-              "event_category",
-              "priority",
-              "priority_label",
-              "attributes",
-              "comment",
-              "title",
-              "reported_by",
-              "state",
-              "is_contained_in",
-              "sort_at",
-              "patrol_segments",
-              "geometry",
-              "updated_at",
-              "created_at",
-              "icon_id",
-              "serial_number",
-              "url",
-              "image_url",
-              "geojson",
-              "is_collection",
-              "event_details",
-              "related_subjects",
-              "patrols"
-            ],
-            "type": "string"
-          },
-          "title": "Event Columns",
-          "type": "array",
-          "description": "Choose the interested event columns. If none is chosen, all columns will be returned.",
-          "uniqueItems": true
-        },
-        "include_null_geometry": {
-          "default": true,
-          "title": "Include Events Without a Geometry (point or polygon)",
-          "type": "boolean"
-        },
-        "include_details": {
-          "default": false,
-          "title": "Include Details",
-          "type": "boolean",
-          "description": "Whether or not to include event details",
-          "ecoscope:advanced": true
-        },
-        "include_updates": {
-          "default": false,
-          "title": "Include Updates",
-          "type": "boolean",
-          "description": "Whether or not to include event updates",
-          "ecoscope:advanced": true
-        },
-        "include_related_events": {
-          "default": false,
-          "title": "Include Related Events",
-          "type": "boolean",
-          "description": "Whether or not to include related events",
-          "ecoscope:advanced": true
-        },
-        "include_display_values": {
-          "default": true,
-          "title": "Include Display Values",
-          "type": "boolean",
-          "description": "Whether or not to include display values for event types",
-          "ecoscope:advanced": true
-        },
-        "force_point_geometry": {
-          "default": true,
-          "title": "Force Point Geometry",
-          "type": "boolean",
-          "description": "If True, polygon/multipolygon event geometries are reduced to their centroid. Set False to preserve native geometry types.",
-          "ecoscope:advanced": true
-        }
-      },
-      "required": [],
-      "type": "object",
-      "title": "Controlled Burn Events"
-    },
     "firms_event_type": {
       "additionalProperties": false,
       "properties": {
@@ -460,108 +333,6 @@
       "type": "object",
       "required": [],
       "title": "FIRMS Event Type"
-    },
-    "firms_events": {
-      "additionalProperties": false,
-      "properties": {
-        "event_columns": {
-          "default": [
-            "id",
-            "time",
-            "event_type",
-            "event_category",
-            "title",
-            "reported_by",
-            "created_at",
-            "serial_number",
-            "is_collection",
-            "event_details",
-            "geometry"
-          ],
-          "items": {
-            "enum": [
-              "id",
-              "location",
-              "time",
-              "end_time",
-              "message",
-              "provenance",
-              "event_type",
-              "event_category",
-              "priority",
-              "priority_label",
-              "attributes",
-              "comment",
-              "title",
-              "reported_by",
-              "state",
-              "is_contained_in",
-              "sort_at",
-              "patrol_segments",
-              "geometry",
-              "updated_at",
-              "created_at",
-              "icon_id",
-              "serial_number",
-              "url",
-              "image_url",
-              "geojson",
-              "is_collection",
-              "event_details",
-              "related_subjects",
-              "patrols"
-            ],
-            "type": "string"
-          },
-          "title": "Event Columns",
-          "type": "array",
-          "description": "Choose the interested event columns. If none is chosen, all columns will be returned.",
-          "uniqueItems": true
-        },
-        "include_null_geometry": {
-          "default": true,
-          "title": "Include Events Without a Geometry (point or polygon)",
-          "type": "boolean"
-        },
-        "include_details": {
-          "default": false,
-          "title": "Include Details",
-          "type": "boolean",
-          "description": "Whether or not to include event details",
-          "ecoscope:advanced": true
-        },
-        "include_updates": {
-          "default": false,
-          "title": "Include Updates",
-          "type": "boolean",
-          "description": "Whether or not to include event updates",
-          "ecoscope:advanced": true
-        },
-        "include_related_events": {
-          "default": false,
-          "title": "Include Related Events",
-          "type": "boolean",
-          "description": "Whether or not to include related events",
-          "ecoscope:advanced": true
-        },
-        "include_display_values": {
-          "default": true,
-          "title": "Include Display Values",
-          "type": "boolean",
-          "description": "Whether or not to include display values for event types",
-          "ecoscope:advanced": true
-        },
-        "force_point_geometry": {
-          "default": true,
-          "title": "Force Point Geometry",
-          "type": "boolean",
-          "description": "If True, polygon/multipolygon event geometries are reduced to their centroid. Set False to preserve native geometry types.",
-          "ecoscope:advanced": true
-        }
-      },
-      "required": [],
-      "type": "object",
-      "title": "FIRMS Events"
     },
     "severity_result": {
       "additionalProperties": false,
@@ -628,55 +399,6 @@
       "required": [],
       "type": "object",
       "title": "Severity Layer"
-    },
-    "aoi_layer": {
-      "additionalProperties": false,
-      "properties": {
-        "color": {
-          "default": "#FF8C00",
-          "title": "Color",
-          "type": "string",
-          "description": "Hex colour for this layer's lines/outlines/points."
-        }
-      },
-      "required": [],
-      "type": "object",
-      "title": "AOI Boundary Layer"
-    },
-    "overlay_layer": {
-      "additionalProperties": false,
-      "properties": {
-        "color": {
-          "default": "#FF8C00",
-          "title": "Color",
-          "type": "string",
-          "description": "Hex colour for this layer's lines/outlines/points."
-        }
-      },
-      "required": [],
-      "type": "object",
-      "title": "Overlay Layer"
-    },
-    "severity_file": {
-      "additionalProperties": false,
-      "properties": {
-        "filename": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Filename",
-          "description": "            Optional filename to persist text to within the `root_path`.\n            If not provided, a filename will be generated based on a hash of the df content.\n            "
-        }
-      },
-      "required": [],
-      "type": "object",
-      "title": "Severity GeoJSON"
     }
   },
   "$defs": {
@@ -705,34 +427,6 @@
       ],
       "title": "GoogleEarthEngineConnection",
       "type": "object"
-    },
-    "TimezoneInfo": {
-      "properties": {
-        "label": {
-          "title": "Label",
-          "type": "string"
-        },
-        "tzCode": {
-          "title": "Tzcode",
-          "type": "string"
-        },
-        "name": {
-          "title": "Name",
-          "type": "string"
-        },
-        "utc": {
-          "title": "Utc",
-          "type": "string"
-        }
-      },
-      "required": [
-        "label",
-        "tzCode",
-        "name",
-        "utc"
-      ],
-      "title": "TimezoneInfo",
-      "type": "object"
     }
   },
   "uiSchema": {
@@ -740,34 +434,6 @@
       "ui:order": [
         "name",
         "description"
-      ]
-    },
-    "fire_time_range": {
-      "ui:order": [
-        "timezone",
-        "time_format"
-      ]
-    },
-    "controlled_burn_events": {
-      "ui:order": [
-        "event_columns",
-        "include_null_geometry",
-        "include_details",
-        "include_updates",
-        "include_related_events",
-        "include_display_values",
-        "force_point_geometry"
-      ]
-    },
-    "firms_events": {
-      "ui:order": [
-        "event_columns",
-        "include_null_geometry",
-        "include_details",
-        "include_updates",
-        "include_related_events",
-        "include_display_values",
-        "force_point_geometry"
       ]
     },
     "severity_result": {
@@ -788,16 +454,10 @@
       "base_maps",
       "fire_start_date",
       "fire_end_date",
-      "fire_time_range",
       "controlled_burn_event_type",
-      "controlled_burn_events",
       "firms_event_type",
-      "firms_events",
       "severity_result",
-      "severity_layer",
-      "aoi_layer",
-      "overlay_layer",
-      "severity_file"
+      "severity_layer"
     ]
   },
   "additionalProperties": false

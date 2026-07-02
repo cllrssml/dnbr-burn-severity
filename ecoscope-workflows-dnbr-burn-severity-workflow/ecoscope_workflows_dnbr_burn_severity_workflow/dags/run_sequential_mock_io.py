@@ -75,6 +75,7 @@ from dnbr_severity_tasks import format_area_ha as format_area_ha
 from dnbr_severity_tasks import format_dnbr_threshold as format_dnbr_threshold
 from dnbr_severity_tasks import format_image_count as format_image_count
 from dnbr_severity_tasks import format_mean_dnbr as format_mean_dnbr
+from dnbr_severity_tasks import format_output_filename as format_output_filename
 from dnbr_severity_tasks import format_percent_burned as format_percent_burned
 from dnbr_severity_tasks import get_aoi_area_ha as get_aoi_area_ha
 from dnbr_severity_tasks import get_dnbr_threshold as get_dnbr_threshold
@@ -325,6 +326,8 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
         .partial(
             since=fire_start_dt,
             until=fire_end_dt,
+            timezone=None,
+            time_format="%d %b %Y %H:%M:%S",
             **(params.get("fire_time_range") or {}),
         )
         .call()
@@ -364,6 +367,13 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
             time_range=fire_time_range,
             event_types=[controlled_burn_event_type],
             raise_on_empty=False,
+            event_columns=["time", "title", "event_type", "reported_by", "geometry"],
+            include_null_geometry=False,
+            include_details=False,
+            include_updates=False,
+            include_related_events=False,
+            include_display_values=False,
+            force_point_geometry=False,
             **(params.get("controlled_burn_events") or {}),
         )
         .call()
@@ -425,6 +435,13 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
             time_range=fire_time_range,
             event_types=[firms_event_type],
             raise_on_empty=False,
+            event_columns=["time", "title", "event_type", "reported_by", "geometry"],
+            include_null_geometry=False,
+            include_details=False,
+            include_updates=False,
+            include_related_events=False,
+            include_display_values=False,
+            force_point_geometry=False,
             **(params.get("firms_events") or {}),
         )
         .call()
@@ -506,7 +523,10 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
             unpack_depth=1,
         )
         .partial(
-            geodataframe=aoi_features, zoom=True, **(params.get("aoi_layer") or {})
+            geodataframe=aoi_features,
+            zoom=True,
+            color="#FF8C00",
+            **(params.get("aoi_layer") or {}),
         )
         .call()
     )
@@ -527,6 +547,7 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
         .partial(
             geodataframe=overlay_features,
             zoom=False,
+            color="#FF8C00",
             **(params.get("overlay_layer") or {}),
         )
         .call()
@@ -623,6 +644,27 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
         .call()
     )
 
+    output_filename = (
+        task(format_output_filename)
+        .validate()
+        .set_task_instance_id("output_filename")
+        .handle_errors()
+        .with_tracing()
+        .skipif(
+            conditions=[
+                any_is_empty_df,
+                any_dependency_skipped,
+            ],
+            unpack_depth=1,
+        )
+        .partial(
+            fire_start_date=fire_start_date,
+            fire_end_date=fire_end_date,
+            **(params.get("output_filename") or {}),
+        )
+        .call()
+    )
+
     severity_file = (
         task(persist_df)
         .validate()
@@ -640,6 +682,7 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
             df=severity_result,
             root_path=os.environ["ECOSCOPE_WORKFLOWS_RESULTS"],
             filetype="geojson",
+            filename=output_filename,
             **(params.get("severity_file") or {}),
         )
         .call()

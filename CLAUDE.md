@@ -75,6 +75,32 @@ also accepts optional `controlled_burn_layer`/`firms_layer`) →
 stat chain: burned_area → high_severity → (aoi_area → percent_burned) → threshold → mean_dnbr → pre_scenes → post_scenes →
 `gather_dashboard` (`time_range: ~`).
 
+### Form simplification — v3.0.0, added 2026-07-02
+
+v2.0.0 accidentally exposed a wall of technical fields alongside the two event-type
+slugs: `get_events`'s `event_columns`/`include_*`/`force_point_geometry` flags (one set
+per overlay), a raw hex `color` field on `aoi_layer`/`overlay_layer` (a side-effect of
+parameterising `create_styled_overlay_layer` for the new overlay colours), a
+`timezone`/`time_format` pair on `fire_time_range` that duplicated the Fire Start/End
+Date fields already answered elsewhere, and a "Severity GeoJSON" section whose only
+field was an optional hash-based `filename`. Fixed by binding every one of those via
+`partial:` instead of leaving them unbound — once a step has zero unbound params it
+disappears from the form entirely (same mechanism `controlled_burn_layer`/`firms_layer`
+already relied on). User-facing form is now: connections, AOI, optional overlay group,
+fire dates, the two event-type slugs, satellite/threshold params, severity opacity —
+nothing else.
+
+**Real bug caught in the process, not just UX noise:** `get_events` defaults
+`force_point_geometry=True` ("If True, polygon/multipolygon event geometries are reduced
+to their centroid"). Left unbound in v2.0.0, this meant Controlled Burn polygons would
+have been silently collapsed to points on the map — the opposite of what was asked for
+("bring in the polygons"). Now explicitly `false` for both overlays.
+
+GeoJSON filename is no longer a form field either — a new tiny task
+(`format_output_filename`) builds `dnbr_burn_severity_<fire_start_date>_to_<fire_end_date>`
+from the two date steps already in the DAG, so exports in the Files tab stay
+distinguishable across runs without asking the user to name anything.
+
 ### ER event overlays (controlled burns, FIRMS) — v2.0.0, added 2026-07-02
 
 Two optional blank-by-default text fields ("Controlled Burn Event Type", "FIRMS

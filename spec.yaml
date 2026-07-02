@@ -99,6 +99,8 @@ workflow:
     partial:
       since: ${{ workflow.fire_start_dt.return }}
       until: ${{ workflow.fire_end_dt.return }}
+      timezone: ~
+      time_format: "%d %b %Y %H:%M:%S"
 
   # --- Optional: Controlled Burn events (visual reference only) ---------------
   - name: Controlled Burn Event Type
@@ -117,6 +119,18 @@ workflow:
       event_types:
         - ${{ workflow.controlled_burn_event_type.return }}
       raise_on_empty: false
+      event_columns:
+        - time
+        - title
+        - event_type
+        - reported_by
+        - geometry
+      include_null_geometry: false
+      include_details: false
+      include_updates: false
+      include_related_events: false
+      include_display_values: false
+      force_point_geometry: false
 
   - name: Controlled Burn Layer
     id: controlled_burn_layer
@@ -147,6 +161,18 @@ workflow:
       event_types:
         - ${{ workflow.firms_event_type.return }}
       raise_on_empty: false
+      event_columns:
+        - time
+        - title
+        - event_type
+        - reported_by
+        - geometry
+      include_null_geometry: false
+      include_details: false
+      include_updates: false
+      include_related_events: false
+      include_display_values: false
+      force_point_geometry: false
 
   - name: FIRMS Layer
     id: firms_layer
@@ -184,6 +210,7 @@ workflow:
     partial:
       geodataframe: ${{ workflow.aoi_features.return }}
       zoom: true
+      color: "#FF8C00"
 
   # --- Optional user overlay --------------------------------------------------
   - name: Overlay Layer
@@ -196,6 +223,7 @@ workflow:
     partial:
       geodataframe: ${{ workflow.overlay_features.return }}
       zoom: false
+      color: "#FF8C00"
 
   # --- Combine layers: severity + AOI boundary + optional overlay -------------
   # skipif: any_is_empty_df ONLY — task handles SkipSentinel from overlay_layer
@@ -256,6 +284,13 @@ workflow:
       data: ${{ workflow.severity_map_url.return }}
 
   # --- GeoJSON export (Desktop Files tab) -------------------------------------
+  - name: Output Filename
+    id: output_filename
+    task: format_output_filename
+    partial:
+      fire_start_date: ${{ workflow.fire_start_date.return }}
+      fire_end_date: ${{ workflow.fire_end_date.return }}
+
   - name: Severity GeoJSON
     id: severity_file
     task: persist_df
@@ -263,6 +298,7 @@ workflow:
       df: ${{ workflow.severity_result.return }}
       root_path: ${{ env.ECOSCOPE_WORKFLOWS_RESULTS }}
       filetype: geojson
+      filename: ${{ workflow.output_filename.return }}
 
   # --- Stat: burned area ------------------------------------------------------
   - name: Burned Area

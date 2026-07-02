@@ -289,6 +289,13 @@ def set_firms_event_type(
 
 
 @register(tags=["fire"])
+def format_output_filename(fire_start_date: str, fire_end_date: str) -> str:
+    """Build a human-readable GeoJSON filename from the fire window, so exports in the
+    Files tab are distinguishable across runs without asking the user to type one in."""
+    return f"dnbr_burn_severity_{fire_start_date}_to_{fire_end_date}"
+
+
+@register(tags=["fire"])
 def parse_fire_start_datetime(fire_start_date: str) -> datetime:
     """Parse the fire start date string into a tz-aware datetime, for feeding the
     built-in set_time_range task (so the ER event overlays below share the same
