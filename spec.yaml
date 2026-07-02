@@ -71,6 +71,95 @@ workflow:
     id: base_maps
     task: set_base_maps
 
+  # --- Fire window (own steps so the dates can be reused by the ER event ------
+  # overlays below, not just the dNBR computation) ------------------------------
+  - name: Fire Start Date
+    id: fire_start_date
+    task: set_fire_start_date
+
+  - name: Fire End Date
+    id: fire_end_date
+    task: set_fire_end_date
+
+  - name: Fire Start Datetime
+    id: fire_start_dt
+    task: parse_fire_start_datetime
+    partial:
+      fire_start_date: ${{ workflow.fire_start_date.return }}
+
+  - name: Fire End Datetime
+    id: fire_end_dt
+    task: parse_fire_end_datetime
+    partial:
+      fire_end_date: ${{ workflow.fire_end_date.return }}
+
+  - name: Fire Time Range
+    id: fire_time_range
+    task: set_time_range
+    partial:
+      since: ${{ workflow.fire_start_dt.return }}
+      until: ${{ workflow.fire_end_dt.return }}
+
+  # --- Optional: Controlled Burn events (visual reference only) ---------------
+  - name: Controlled Burn Event Type
+    id: controlled_burn_event_type
+    task: set_controlled_burn_event_type
+
+  - name: Controlled Burn Events
+    id: controlled_burn_events
+    task: get_events
+    skipif:
+      conditions:
+        - any_dependency_is_empty_string
+    partial:
+      client: ${{ workflow.er_connection.return }}
+      time_range: ${{ workflow.fire_time_range.return }}
+      event_types:
+        - ${{ workflow.controlled_burn_event_type.return }}
+      raise_on_empty: false
+
+  - name: Controlled Burn Layer
+    id: controlled_burn_layer
+    task: create_styled_overlay_layer
+    skipif:
+      conditions:
+        - any_dependency_skipped
+        - any_is_empty_df
+    partial:
+      geodataframe: ${{ workflow.controlled_burn_events.return }}
+      zoom: false
+      color: "#1E90FF"
+
+  # --- Optional: FIRMS detections (visual reference only) ----------------------
+  - name: FIRMS Event Type
+    id: firms_event_type
+    task: set_firms_event_type
+
+  - name: FIRMS Events
+    id: firms_events
+    task: get_events
+    skipif:
+      conditions:
+        - any_dependency_is_empty_string
+    partial:
+      client: ${{ workflow.er_connection.return }}
+      time_range: ${{ workflow.fire_time_range.return }}
+      event_types:
+        - ${{ workflow.firms_event_type.return }}
+      raise_on_empty: false
+
+  - name: FIRMS Layer
+    id: firms_layer
+    task: create_styled_overlay_layer
+    skipif:
+      conditions:
+        - any_dependency_skipped
+        - any_is_empty_df
+    partial:
+      geodataframe: ${{ workflow.firms_events.return }}
+      zoom: false
+      color: "#FF00FF"
+
   # --- dNBR severity computation (GEE) ----------------------------------------
   - name: Compute Severity
     id: severity_result
@@ -78,6 +167,8 @@ workflow:
     partial:
       client: ${{ workflow.gee_connection.return }}
       aoi: ${{ workflow.aoi_features.return }}
+      fire_start_date: ${{ workflow.fire_start_date.return }}
+      fire_end_date: ${{ workflow.fire_end_date.return }}
 
   # --- Severity polygon layer -------------------------------------------------
   - name: Severity Layer
@@ -119,6 +210,8 @@ workflow:
       severity_layer: ${{ workflow.severity_layer.return }}
       aoi_layer: ${{ workflow.aoi_layer.return }}
       overlay_layer: ${{ workflow.overlay_layer.return }}
+      controlled_burn_layer: ${{ workflow.controlled_burn_layer.return }}
+      firms_layer: ${{ workflow.firms_layer.return }}
 
   # --- Severity map -----------------------------------------------------------
   - name: Severity Map

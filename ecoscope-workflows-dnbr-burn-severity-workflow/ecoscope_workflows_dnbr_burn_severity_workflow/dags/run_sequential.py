@@ -23,9 +23,19 @@ from dnbr_severity_tasks import format_percent_burned as format_percent_burned
 from dnbr_severity_tasks import get_aoi_area_ha as get_aoi_area_ha
 from dnbr_severity_tasks import get_dnbr_threshold as get_dnbr_threshold
 from dnbr_severity_tasks import get_percent_burned as get_percent_burned
+from dnbr_severity_tasks import parse_fire_end_datetime as parse_fire_end_datetime
+from dnbr_severity_tasks import parse_fire_start_datetime as parse_fire_start_datetime
 from dnbr_severity_tasks import set_aoi_group_name as set_aoi_group_name
+from dnbr_severity_tasks import (
+    set_controlled_burn_event_type as set_controlled_burn_event_type,
+)
+from dnbr_severity_tasks import set_fire_end_date as set_fire_end_date
+from dnbr_severity_tasks import set_fire_start_date as set_fire_start_date
+from dnbr_severity_tasks import set_firms_event_type as set_firms_event_type
 from dnbr_severity_tasks import set_overlay_group_name as set_overlay_group_name
 from ecoscope.platform.tasks.config import set_workflow_details as set_workflow_details
+from ecoscope.platform.tasks.filter import set_time_range as set_time_range
+from ecoscope.platform.tasks.io import get_events as get_events
 from ecoscope.platform.tasks.io import (
     get_spatial_features_group as get_spatial_features_group,
 )
@@ -203,6 +213,217 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
         .call()
     )
 
+    fire_start_date = (
+        task(set_fire_start_date)
+        .validate()
+        .set_task_instance_id("fire_start_date")
+        .handle_errors()
+        .with_tracing()
+        .skipif(
+            conditions=[
+                any_is_empty_df,
+                any_dependency_skipped,
+            ],
+            unpack_depth=1,
+        )
+        .partial(**(params.get("fire_start_date") or {}))
+        .call()
+    )
+
+    fire_end_date = (
+        task(set_fire_end_date)
+        .validate()
+        .set_task_instance_id("fire_end_date")
+        .handle_errors()
+        .with_tracing()
+        .skipif(
+            conditions=[
+                any_is_empty_df,
+                any_dependency_skipped,
+            ],
+            unpack_depth=1,
+        )
+        .partial(**(params.get("fire_end_date") or {}))
+        .call()
+    )
+
+    fire_start_dt = (
+        task(parse_fire_start_datetime)
+        .validate()
+        .set_task_instance_id("fire_start_dt")
+        .handle_errors()
+        .with_tracing()
+        .skipif(
+            conditions=[
+                any_is_empty_df,
+                any_dependency_skipped,
+            ],
+            unpack_depth=1,
+        )
+        .partial(fire_start_date=fire_start_date, **(params.get("fire_start_dt") or {}))
+        .call()
+    )
+
+    fire_end_dt = (
+        task(parse_fire_end_datetime)
+        .validate()
+        .set_task_instance_id("fire_end_dt")
+        .handle_errors()
+        .with_tracing()
+        .skipif(
+            conditions=[
+                any_is_empty_df,
+                any_dependency_skipped,
+            ],
+            unpack_depth=1,
+        )
+        .partial(fire_end_date=fire_end_date, **(params.get("fire_end_dt") or {}))
+        .call()
+    )
+
+    fire_time_range = (
+        task(set_time_range)
+        .validate()
+        .set_task_instance_id("fire_time_range")
+        .handle_errors()
+        .with_tracing()
+        .skipif(
+            conditions=[
+                any_is_empty_df,
+                any_dependency_skipped,
+            ],
+            unpack_depth=1,
+        )
+        .partial(
+            since=fire_start_dt,
+            until=fire_end_dt,
+            **(params.get("fire_time_range") or {}),
+        )
+        .call()
+    )
+
+    controlled_burn_event_type = (
+        task(set_controlled_burn_event_type)
+        .validate()
+        .set_task_instance_id("controlled_burn_event_type")
+        .handle_errors()
+        .with_tracing()
+        .skipif(
+            conditions=[
+                any_is_empty_df,
+                any_dependency_skipped,
+            ],
+            unpack_depth=1,
+        )
+        .partial(**(params.get("controlled_burn_event_type") or {}))
+        .call()
+    )
+
+    controlled_burn_events = (
+        task(get_events)
+        .validate()
+        .set_task_instance_id("controlled_burn_events")
+        .handle_errors()
+        .with_tracing()
+        .skipif(
+            conditions=[
+                any_dependency_is_empty_string,
+            ],
+            unpack_depth=1,
+        )
+        .partial(
+            client=er_connection,
+            time_range=fire_time_range,
+            event_types=[controlled_burn_event_type],
+            raise_on_empty=False,
+            **(params.get("controlled_burn_events") or {}),
+        )
+        .call()
+    )
+
+    controlled_burn_layer = (
+        task(create_styled_overlay_layer)
+        .validate()
+        .set_task_instance_id("controlled_burn_layer")
+        .handle_errors()
+        .with_tracing()
+        .skipif(
+            conditions=[
+                any_dependency_skipped,
+                any_is_empty_df,
+            ],
+            unpack_depth=1,
+        )
+        .partial(
+            geodataframe=controlled_burn_events,
+            zoom=False,
+            color="#1E90FF",
+            **(params.get("controlled_burn_layer") or {}),
+        )
+        .call()
+    )
+
+    firms_event_type = (
+        task(set_firms_event_type)
+        .validate()
+        .set_task_instance_id("firms_event_type")
+        .handle_errors()
+        .with_tracing()
+        .skipif(
+            conditions=[
+                any_is_empty_df,
+                any_dependency_skipped,
+            ],
+            unpack_depth=1,
+        )
+        .partial(**(params.get("firms_event_type") or {}))
+        .call()
+    )
+
+    firms_events = (
+        task(get_events)
+        .validate()
+        .set_task_instance_id("firms_events")
+        .handle_errors()
+        .with_tracing()
+        .skipif(
+            conditions=[
+                any_dependency_is_empty_string,
+            ],
+            unpack_depth=1,
+        )
+        .partial(
+            client=er_connection,
+            time_range=fire_time_range,
+            event_types=[firms_event_type],
+            raise_on_empty=False,
+            **(params.get("firms_events") or {}),
+        )
+        .call()
+    )
+
+    firms_layer = (
+        task(create_styled_overlay_layer)
+        .validate()
+        .set_task_instance_id("firms_layer")
+        .handle_errors()
+        .with_tracing()
+        .skipif(
+            conditions=[
+                any_dependency_skipped,
+                any_is_empty_df,
+            ],
+            unpack_depth=1,
+        )
+        .partial(
+            geodataframe=firms_events,
+            zoom=False,
+            color="#FF00FF",
+            **(params.get("firms_layer") or {}),
+        )
+        .call()
+    )
+
     severity_result = (
         task(compute_dnbr_severity)
         .validate()
@@ -219,6 +440,8 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
         .partial(
             client=gee_connection,
             aoi=aoi_features,
+            fire_start_date=fire_start_date,
+            fire_end_date=fire_end_date,
             **(params.get("severity_result") or {}),
         )
         .call()
@@ -297,6 +520,8 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
             severity_layer=severity_layer,
             aoi_layer=aoi_layer,
             overlay_layer=overlay_layer,
+            controlled_burn_layer=controlled_burn_layer,
+            firms_layer=firms_layer,
             **(params.get("combined_layers") or {}),
         )
         .call()

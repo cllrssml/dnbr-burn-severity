@@ -49,15 +49,59 @@ control at default scale, not the patch filter.
 `set_aoi_group_name` → `get_spatial_features_group` id=`aoi_features` →
 `set_overlay_group_name` → `get_spatial_features_group` id=`overlay_features` (`skipif: any_dependency_is_empty_string`) →
 `set_base_maps` →
-`compute_dnbr_severity` (custom; partial client+aoi; user params: fire_start_date, fire_end_date, satellite=Sentinel-2, pre_fire_days=90, post_fire_days=30, scale=100, dnbr_threshold=0.20) →
+`set_fire_start_date` / `set_fire_end_date` (custom; own steps, not inline params, so the
+raw date strings can be reused below) → `parse_fire_start_datetime` / `parse_fire_end_datetime`
+(custom; str→tz-aware datetime, end date advanced +1 day for inclusive end-of-day) →
+`set_time_range` (built-in) id=`fire_time_range` →
+`set_controlled_burn_event_type` / `set_firms_event_type` (custom; blank-default text
+fields, example slugs `controlled_burn` / `firms_rep` in the description) →
+`get_events` (built-in) id=`controlled_burn_events` / `firms_events` — `event_types` bound
+as a one-item list `[${{ workflow.<event_type>.return }}]`, `time_range` = fire window
+(not the wider pre/post composite window), `raise_on_empty: false` (must not error the
+whole run when a reserve has zero controlled burns/FIRMS hits that period) — both
+`skipif: any_dependency_is_empty_string` →
+`create_styled_overlay_layer` id=`controlled_burn_layer` (color=`#1E90FF`) /
+`firms_layer` (color=`#FF00FF`) — `skipif: any_dependency_skipped, any_is_empty_df` →
+`compute_dnbr_severity` (custom; partial client+aoi+fire_start_date+fire_end_date
+[now bound to the shared steps above, not inline]; user params: satellite=Sentinel-2,
+pre_fire_days=90, post_fire_days=30, scale=100, dnbr_threshold=0.20) →
 `create_dnbr_severity_layer` (zoom=False) →
 `create_styled_overlay_layer` id=`aoi_layer` (zoom=true — AOI boundary is the zoom target) →
 `create_styled_overlay_layer` id=`overlay_layer` (zoom=false; `skipif: any_dependency_skipped, any_is_empty_df`) →
-`combine_severity_layers` (`skipif: any_is_empty_df` ONLY — handles SkipSentinel) →
+`combine_severity_layers` (`skipif: any_is_empty_df` ONLY — handles SkipSentinel; now
+also accepts optional `controlled_burn_layer`/`firms_layer`) →
 `draw_ecomap` → `persist_text` → `create_map_widget_single_view` (`skipif: never`) →
 `persist_df` id=`severity_file` (geojson → Files tab) →
 stat chain: burned_area → high_severity → (aoi_area → percent_burned) → threshold → mean_dnbr → pre_scenes → post_scenes →
 `gather_dashboard` (`time_range: ~`).
+
+### ER event overlays (controlled burns, FIRMS) — v2.0.0, added 2026-07-02
+
+Two optional blank-by-default text fields ("Controlled Burn Event Type", "FIRMS
+Detections Event Type") let the user paste their ER event-type slug; when filled, matching
+events within the same fire window as the dNBR computation are drawn on the map as a
+**visual reference only** — they never feed the dNBR computation, threshold, or any stat
+widget. `create_styled_overlay_layer` gained a `color` param (default `#FF8C00`, unchanged
+for `aoi_layer`/`overlay_layer`) so these two new layers get distinct colours from the
+general-purpose overlay and from the severity palette.
+
+**Trap: `ecoscope_workflows_core` is NOT importable at module level in a custom task
+package**, even though it's the lightweight core framework (no geopandas/GEE) — same
+failure mode as Trap 27, wider than just `ecoscope.*`. `wt-compiler`'s task-discovery env is
+a bare pip/uv venv with only `wt-registry` + the package's own declared deps installed; it
+does not have any conda-installed packages, including `ecoscope-workflows-core`. A
+module-level `from ecoscope_workflows_core.tasks.filter import TimeRange` silently broke
+discovery for **every** task in the file (all showed as "not a registered known task
+name", not just the new ones) — no import traceback surfaced, so the symptom looked
+unrelated to the actual cause. Also do not add `ecoscope-workflows-core` to the package's
+`pyproject.toml` dependencies — it isn't on PyPI, so the compiler's pip-install step
+fails outright ("was not found in the package registry").
+**Fix:** never construct a `TimeRange` (or import anything from `ecoscope_workflows_core`)
+inside a custom task. Instead, do the date-string parsing in plain stdlib
+(`datetime.strptime` → tz-aware `datetime`, exactly like `compute_dnbr_severity` already
+does internally) and feed the result into the **built-in** `set_time_range` task via
+`partial:` — it already knows how to construct the exact `TimeRange` type downstream
+tasks expect, so a custom package never needs to depend on the class itself.
 
 ## Dashboard layout (8 widgets, 0-indexed)
 

@@ -210,6 +210,99 @@ def set_overlay_group_name(
     return group_name
 
 
+# ── Fire window (split into their own steps so the date strings can be reused ──
+# by both compute_dnbr_severity and the ER event-overlay time range below) ─────
+
+@register()
+def set_fire_start_date(
+    fire_start_date: Annotated[
+        str,
+        Field(
+            title="Fire Start Date",
+            description="Start of the fire (or scan window), YYYY-MM-DD. Pre-fire imagery is taken before this date.",
+            pattern=r"^\d{4}-\d{2}-\d{2}$",
+            json_schema_extra={"format": "date"},
+        ),
+    ],
+) -> str:
+    """Return the fire start date as-is; exposes a well-labelled, reusable form field."""
+    return fire_start_date
+
+
+@register()
+def set_fire_end_date(
+    fire_end_date: Annotated[
+        str,
+        Field(
+            title="Fire End Date",
+            description="End of the fire (or scan window), YYYY-MM-DD. Use the same value as the start date for a single-day fire.",
+            pattern=r"^\d{4}-\d{2}-\d{2}$",
+            json_schema_extra={"format": "date"},
+        ),
+    ],
+) -> str:
+    """Return the fire end date as-is; exposes a well-labelled, reusable form field."""
+    return fire_end_date
+
+
+# ── Optional ER event overlays (visual reference only — do not feed the dNBR ───
+# computation, threshold, or any stat widget) ───────────────────────────────────
+
+@register()
+def set_controlled_burn_event_type(
+    event_type: Annotated[
+        str,
+        Field(
+            title="Controlled Burn Event Type (optional)",
+            description=(
+                "EarthRanger event type slug used to log controlled/prescribed burns, "
+                "e.g. 'controlled_burn'. When set, matching events within the fire window "
+                "are drawn on the map as a visual reference only — they do not affect the "
+                "dNBR computation. Leave blank for none."
+            ),
+            default="",
+        ),
+    ] = "",
+) -> str:
+    """Return the controlled-burn event type slug as-is; exposes a labelled form field."""
+    return event_type
+
+
+@register()
+def set_firms_event_type(
+    event_type: Annotated[
+        str,
+        Field(
+            title="FIRMS Detections Event Type (optional)",
+            description=(
+                "EarthRanger event type slug used for FIRMS fire-detection reports, "
+                "e.g. 'firms_rep'. When set, matching point detections within the fire "
+                "window are drawn on the map as a visual reference only — they do not "
+                "affect the dNBR computation. Leave blank for none."
+            ),
+            default="",
+        ),
+    ] = "",
+) -> str:
+    """Return the FIRMS event type slug as-is; exposes a labelled form field."""
+    return event_type
+
+
+@register(tags=["fire"])
+def parse_fire_start_datetime(fire_start_date: str) -> datetime:
+    """Parse the fire start date string into a tz-aware datetime, for feeding the
+    built-in set_time_range task (so the ER event overlays below share the same
+    fire window as the dNBR computation, not the wider pre/post composite window)."""
+    return datetime.strptime(fire_start_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+
+
+@register(tags=["fire"])
+def parse_fire_end_datetime(fire_end_date: str) -> datetime:
+    """Parse the fire end date string into a tz-aware datetime, advanced by one day
+    so events recorded anywhere on the end date itself are included (inclusive end)."""
+    return datetime.strptime(fire_end_date, "%Y-%m-%d").replace(tzinfo=timezone.utc) + timedelta(days=1)
+
+
 # ── Main GEE computation ──────────────────────────────────────────────────────
 
 @register(tags=["gee", "fire"])
@@ -519,9 +612,14 @@ def create_styled_overlay_layer(
         bool,
         Field(default=False, description="If True, the map zooms to this layer's extent on load."),
     ] = False,
+    color: Annotated[
+        str,
+        Field(default="#FF8C00", description="Hex colour for this layer's lines/outlines/points."),
+    ] = "#FF8C00",
 ) -> Any:
     """
-    Overlay layer for ER spatial features (AOI boundary, roads, fencelines, etc.).
+    Overlay layer for ER spatial features (AOI boundary, roads, fencelines, etc.) or
+    ER events (controlled burns, FIRMS detections).
 
     Splits by geometry type so lonboard never receives mixed types.
     """
@@ -534,7 +632,7 @@ def create_styled_overlay_layer(
 
     gdf = geodataframe.copy()
     geom_col = gdf.geometry.geom_type
-    color, width = "#FF8C00", 2.0
+    width = 2.0
     layers = []
 
     line_gdf = gdf[geom_col.isin({"LineString", "MultiLineString"})].copy()
@@ -578,19 +676,22 @@ def combine_severity_layers(
     severity_layer: Any,
     aoi_layer: Any,
     overlay_layer: Any = None,
+    controlled_burn_layer: Any = None,
+    firms_layer: Any = None,
 ) -> Any:
-    """Combine severity layer + AOI boundary outline + optional user overlay for draw_ecomap.
+    """Combine severity layer + AOI boundary outline + optional overlays for draw_ecomap.
 
     aoi_layer is always shown and is the zoom target (compact, always present).
-    overlay_layer is optional — pass SkipSentinel or None to omit. Handles SkipSentinel
-    internally so the map renders even when the overlay is blank.
+    overlay_layer / controlled_burn_layer / firms_layer are all optional — pass
+    SkipSentinel or None to omit any of them. Handles SkipSentinel internally so the
+    map renders even when one or more overlays are blank.
     """
     from wt_task.skip import SkipSentinel
 
     if isinstance(severity_layer, SkipSentinel):
         return severity_layer
     layers = [severity_layer]
-    for extra in (aoi_layer, overlay_layer):
+    for extra in (aoi_layer, overlay_layer, controlled_burn_layer, firms_layer):
         if isinstance(extra, SkipSentinel) or extra is None:
             continue
         if isinstance(extra, list):
