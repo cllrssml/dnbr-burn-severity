@@ -22,6 +22,7 @@ from typing import Annotated, Any, Literal
 
 import geopandas as gpd
 import numpy as np
+import pandas as pd
 from pydantic import Field
 from pydantic.json_schema import WithJsonSchema
 from wt_registry import register
@@ -925,3 +926,54 @@ def format_area_ha(
         return f"{int(round(area_ha)):,} ha"
     else:
         return f"{area_ha:.1f} ha"
+
+
+# ── Dashboard chart data prep ────────────────────────────────────────────────
+# Both return plain (non-geometry) tables for draw_bar_chart, which does its own
+# groupby/aggregation — these tasks only shape + order the input.
+
+@register(tags=["fire", "stats"])
+def prepare_severity_area_chart_data(geodataframe: _GDF) -> _GDF:
+    """
+    One row per burned polygon: an ordinal-prefixed severity_class ("1. Low" ...
+    "4. High") and area_ha. The prefix guarantees draw_bar_chart's own groupby (which
+    sorts alphabetically, not by detection order) renders the Key & Benson classes in
+    their natural Low→High progression instead of alphabetical ("High, Low,
+    Moderate-High, Moderate-Low").
+    """
+    cols = ["severity_class", "area_ha"]
+    if geodataframe.empty:
+        return pd.DataFrame(columns=cols)
+    order = {name: i + 1 for i, name in enumerate(_BURNED_NAMES)}
+    out = geodataframe[["severity_class", "area_ha"]].copy()
+    out["severity_class"] = out["severity_class"].map(
+        lambda c: f"{order.get(c, 0)}. {c}"
+    )
+    return out
+
+
+@register(tags=["fire", "stats"])
+def prepare_dnbr_histogram_data(geodataframe: _GDF) -> _GDF:
+    """
+    Bin per-polygon mean dNBR into fixed 50-unit-wide bins (bin lower edge as an int
+    category, so draw_bar_chart's groupby sorts it correctly with no ordering hack
+    needed) for a histogram-style bar chart.
+
+    This is the diagnostic the false-positive incident (see CLAUDE.md) would have
+    caught immediately: a real fire's polygons form a right-skewed/bimodal shape with
+    a distinct high-value cluster well clear of the detection floor; a landscape-wide
+    seasonal-drying false positive shows a tight mass hugging just above the threshold
+    with no separation.
+    """
+    cols = ["dnbr_bin", "dNBR"]
+    if geodataframe.empty or "dNBR" not in geodataframe.columns:
+        return pd.DataFrame(columns=cols)
+    values = geodataframe["dNBR"].astype(float)
+    bin_width = 50
+    lo = int(np.floor(values.min() / bin_width) * bin_width)
+    hi = int(np.ceil(values.max() / bin_width) * bin_width)
+    edges = list(range(lo, hi + bin_width, bin_width))
+    if len(edges) < 2:
+        edges = [lo, lo + bin_width]
+    bins = pd.cut(values, bins=edges, right=False, labels=edges[:-1])
+    return pd.DataFrame({"dnbr_bin": bins.astype(int), "dNBR": values})

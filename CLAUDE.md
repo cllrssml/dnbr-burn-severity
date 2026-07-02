@@ -75,6 +75,44 @@ also accepts optional `controlled_burn_layer`/`firms_layer`) →
 stat chain: burned_area → high_severity → (aoi_area → percent_burned) → threshold → mean_dnbr → pre_scenes → post_scenes →
 `gather_dashboard` (`time_range: ~`).
 
+### Two dashboard charts — v4.0.0, added 2026-07-02
+
+Added the two charts recommended when scoping this out: "Burned Area by Severity
+Class" (bar chart, `severity_class` × sum `area_ha`) and "dNBR Distribution"
+(histogram-as-bar-chart, 50-unit dNBR bins × polygon count). Both are widgets 8/9 in
+`gather_dashboard`, new row in `layout.json` (`y=22`, `w=5` each, `h=8`).
+
+- **Pattern:** `prepare_*_chart_data` (custom, plain non-geometry table) →
+  `draw_bar_chart` (built-in) → `persist_text` → `create_plot_widget_single_view` —
+  identical shape to the existing map chain (`draw_ecomap` → `persist_text` →
+  `create_map_widget_single_view`). `create_plot_widget_single_view`'s `data` param is
+  `PrecomputedHTMLWidgetData = Path | Url | None`, i.e. a **path**, not the raw chart
+  HTML string `draw_bar_chart` returns directly — the `persist_text` step in between
+  isn't optional.
+- **`draw_bar_chart`'s own `data.groupby(category)` sorts alphabetically**, not by
+  input row order. For the severity chart this would render "High, Low,
+  Moderate-High, Moderate-Low" instead of the Key & Benson Low→High progression.
+  Fixed by prefixing `severity_class` with its ordinal ("1. Low" … "4. High") before
+  it reaches `draw_bar_chart` — lexicographic sort on a single leading digit gives the
+  right order for free. For the dNBR histogram, used the bin's integer lower edge as
+  the category instead (ints sort numerically, no hack needed) — also reads better on
+  a histogram x-axis than a text label would.
+- **Reused the `_GDF` shim for plain (non-geometry) DataFrames**, not a new shim for
+  `draw_bar_chart`'s `DataFrame[JsonSerializableDataFrameModel]` param — same
+  reasoning as `persist_df`'s `AnyDataFrame` param already accepting a `_GDF`-typed
+  return (`severity_result` → `severity_file`, working since v1.0.0): the shim is a
+  compiler-side "this is tabular" tag, not a strict runtime type check, and this
+  compiled clean on the first try.
+- **`draw_bar_chart` leaves an optional `layout_kwargs` field unbound** (Advanced,
+  `LayoutStyle`, defaults to null) — same class of thing as `severity_layer`'s already-
+  accepted `opacity` field, not the kind of required/confusing field removed in
+  v3.0.0, so left as-is rather than binding it away.
+- **Diagnostic intent (dNBR Distribution):** this is the chart that would have caught
+  the Trap 30 false-positive before it reached a live Desktop run — a real fire's
+  polygons form a right-skewed/bimodal shape well clear of the detection floor; a
+  landscape-wide seasonal-drying false positive shows a tight mass hugging just above
+  the threshold with no separation.
+
 ### Fix: burn polygon's low-alpha fill blocked the severity tooltip — v3.3.0, added 2026-07-02
 
 Live-tested regression from v3.2.0: fixing the Controlled Burn tooltip (by making its

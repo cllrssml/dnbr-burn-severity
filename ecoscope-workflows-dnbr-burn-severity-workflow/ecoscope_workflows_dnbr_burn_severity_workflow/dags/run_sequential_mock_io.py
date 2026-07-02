@@ -81,14 +81,24 @@ from dnbr_severity_tasks import format_percent_burned as format_percent_burned
 from dnbr_severity_tasks import get_aoi_area_ha as get_aoi_area_ha
 from dnbr_severity_tasks import get_dnbr_threshold as get_dnbr_threshold
 from dnbr_severity_tasks import get_percent_burned as get_percent_burned
+from dnbr_severity_tasks import (
+    prepare_dnbr_histogram_data as prepare_dnbr_histogram_data,
+)
+from dnbr_severity_tasks import (
+    prepare_severity_area_chart_data as prepare_severity_area_chart_data,
+)
 from ecoscope.platform.tasks.io import persist_df as persist_df
 from ecoscope.platform.tasks.io import persist_text as persist_text
 from ecoscope.platform.tasks.results import (
     create_map_widget_single_view as create_map_widget_single_view,
 )
 from ecoscope.platform.tasks.results import (
+    create_plot_widget_single_view as create_plot_widget_single_view,
+)
+from ecoscope.platform.tasks.results import (
     create_text_widget_single_view as create_text_widget_single_view,
 )
+from ecoscope.platform.tasks.results import draw_bar_chart as draw_bar_chart
 from ecoscope.platform.tasks.results import draw_ecomap as draw_ecomap
 from ecoscope.platform.tasks.results import gather_dashboard as gather_dashboard
 from ecoscope.platform.tasks.skip import never as never
@@ -1121,6 +1131,179 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
         .call()
     )
 
+    severity_area_chart_data = (
+        task(prepare_severity_area_chart_data)
+        .validate()
+        .set_task_instance_id("severity_area_chart_data")
+        .handle_errors()
+        .with_tracing()
+        .skipif(
+            conditions=[
+                any_is_empty_df,
+                any_dependency_skipped,
+            ],
+            unpack_depth=1,
+        )
+        .partial(
+            geodataframe=severity_result,
+            **(params.get("severity_area_chart_data") or {}),
+        )
+        .call()
+    )
+
+    severity_area_chart = (
+        task(draw_bar_chart)
+        .validate()
+        .set_task_instance_id("severity_area_chart")
+        .handle_errors()
+        .with_tracing()
+        .skipif(
+            conditions=[
+                any_is_empty_df,
+                any_dependency_skipped,
+            ],
+            unpack_depth=1,
+        )
+        .partial(
+            dataframe=severity_area_chart_data,
+            category="severity_class",
+            bar_chart_configs=[
+                {"column": "area_ha", "agg_func": "sum", "label": "Area (ha)"}
+            ],
+            **(params.get("severity_area_chart") or {}),
+        )
+        .call()
+    )
+
+    severity_area_chart_url = (
+        task(persist_text)
+        .validate()
+        .set_task_instance_id("severity_area_chart_url")
+        .handle_errors()
+        .with_tracing()
+        .skipif(
+            conditions=[
+                any_is_empty_df,
+                any_dependency_skipped,
+            ],
+            unpack_depth=1,
+        )
+        .partial(
+            root_path=os.environ["ECOSCOPE_WORKFLOWS_RESULTS"],
+            filename_suffix="severity_area_chart",
+            text=severity_area_chart,
+            **(params.get("severity_area_chart_url") or {}),
+        )
+        .call()
+    )
+
+    widget_severity_area_chart = (
+        task(create_plot_widget_single_view)
+        .validate()
+        .set_task_instance_id("widget_severity_area_chart")
+        .handle_errors()
+        .with_tracing()
+        .skipif(
+            conditions=[
+                any_is_empty_df,
+                any_dependency_skipped,
+            ],
+            unpack_depth=1,
+        )
+        .partial(
+            title="Burned Area by Severity Class",
+            data=severity_area_chart_url,
+            **(params.get("widget_severity_area_chart") or {}),
+        )
+        .call()
+    )
+
+    dnbr_histogram_data = (
+        task(prepare_dnbr_histogram_data)
+        .validate()
+        .set_task_instance_id("dnbr_histogram_data")
+        .handle_errors()
+        .with_tracing()
+        .skipif(
+            conditions=[
+                any_is_empty_df,
+                any_dependency_skipped,
+            ],
+            unpack_depth=1,
+        )
+        .partial(
+            geodataframe=severity_result, **(params.get("dnbr_histogram_data") or {})
+        )
+        .call()
+    )
+
+    dnbr_histogram = (
+        task(draw_bar_chart)
+        .validate()
+        .set_task_instance_id("dnbr_histogram")
+        .handle_errors()
+        .with_tracing()
+        .skipif(
+            conditions=[
+                any_is_empty_df,
+                any_dependency_skipped,
+            ],
+            unpack_depth=1,
+        )
+        .partial(
+            dataframe=dnbr_histogram_data,
+            category="dnbr_bin",
+            bar_chart_configs=[
+                {"column": "dNBR", "agg_func": "count", "label": "Polygon Count"}
+            ],
+            **(params.get("dnbr_histogram") or {}),
+        )
+        .call()
+    )
+
+    dnbr_histogram_url = (
+        task(persist_text)
+        .validate()
+        .set_task_instance_id("dnbr_histogram_url")
+        .handle_errors()
+        .with_tracing()
+        .skipif(
+            conditions=[
+                any_is_empty_df,
+                any_dependency_skipped,
+            ],
+            unpack_depth=1,
+        )
+        .partial(
+            root_path=os.environ["ECOSCOPE_WORKFLOWS_RESULTS"],
+            filename_suffix="dnbr_histogram",
+            text=dnbr_histogram,
+            **(params.get("dnbr_histogram_url") or {}),
+        )
+        .call()
+    )
+
+    widget_dnbr_histogram = (
+        task(create_plot_widget_single_view)
+        .validate()
+        .set_task_instance_id("widget_dnbr_histogram")
+        .handle_errors()
+        .with_tracing()
+        .skipif(
+            conditions=[
+                any_is_empty_df,
+                any_dependency_skipped,
+            ],
+            unpack_depth=1,
+        )
+        .partial(
+            title="dNBR Distribution",
+            data=dnbr_histogram_url,
+            **(params.get("widget_dnbr_histogram") or {}),
+        )
+        .call()
+    )
+
     dashboard = (
         task(gather_dashboard)
         .validate()
@@ -1145,6 +1328,8 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
                 widget_pre_scenes,
                 widget_post_scenes,
                 map_widget,
+                widget_severity_area_chart,
+                widget_dnbr_histogram,
             ],
             time_range=None,
             **(params.get("dashboard") or {}),

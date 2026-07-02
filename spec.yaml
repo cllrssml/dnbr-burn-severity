@@ -469,10 +469,77 @@ workflow:
       title: Post Imgs
       data: ${{ workflow.post_scenes_fmt.return }}
 
+  # --- Chart: burned area by severity class ------------------------------------
+  - name: Severity Area Chart Data
+    id: severity_area_chart_data
+    task: prepare_severity_area_chart_data
+    partial:
+      geodataframe: ${{ workflow.severity_result.return }}
+
+  - name: Severity Area Chart
+    id: severity_area_chart
+    task: draw_bar_chart
+    partial:
+      dataframe: ${{ workflow.severity_area_chart_data.return }}
+      category: severity_class
+      bar_chart_configs:
+        - column: area_ha
+          agg_func: sum
+          label: "Area (ha)"
+
+  - name: Persist Severity Area Chart
+    id: severity_area_chart_url
+    task: persist_text
+    partial:
+      root_path: ${{ env.ECOSCOPE_WORKFLOWS_RESULTS }}
+      filename_suffix: severity_area_chart
+      text: ${{ workflow.severity_area_chart.return }}
+
+  - name: Severity Area Chart Widget
+    id: widget_severity_area_chart
+    task: create_plot_widget_single_view
+    partial:
+      title: "Burned Area by Severity Class"
+      data: ${{ workflow.severity_area_chart_url.return }}
+
+  # --- Chart: dNBR distribution histogram ---------------------------------------
+  - name: dNBR Histogram Data
+    id: dnbr_histogram_data
+    task: prepare_dnbr_histogram_data
+    partial:
+      geodataframe: ${{ workflow.severity_result.return }}
+
+  - name: dNBR Histogram
+    id: dnbr_histogram
+    task: draw_bar_chart
+    partial:
+      dataframe: ${{ workflow.dnbr_histogram_data.return }}
+      category: dnbr_bin
+      bar_chart_configs:
+        - column: dNBR
+          agg_func: count
+          label: "Polygon Count"
+
+  - name: Persist dNBR Histogram
+    id: dnbr_histogram_url
+    task: persist_text
+    partial:
+      root_path: ${{ env.ECOSCOPE_WORKFLOWS_RESULTS }}
+      filename_suffix: dnbr_histogram
+      text: ${{ workflow.dnbr_histogram.return }}
+
+  - name: dNBR Histogram Widget
+    id: widget_dnbr_histogram
+    task: create_plot_widget_single_view
+    partial:
+      title: "dNBR Distribution"
+      data: ${{ workflow.dnbr_histogram_url.return }}
+
   # --- Dashboard --------------------------------------------------------------
   # Row 1 (y=0): 0=Burned, 1=High Sev, 2=% Burned, 3=Threshold
   # Row 2 (y=3): 4=Mean dNBR, 5=Pre Imgs, 6=Post Imgs
   # Row 3 (y=6): 7=Map
+  # Row 4 (y=22): 8=Area by Severity Class chart, 9=dNBR Histogram
   - name: Dashboard
     id: dashboard
     task: gather_dashboard
@@ -487,6 +554,8 @@ workflow:
         - ${{ workflow.widget_pre_scenes.return }}
         - ${{ workflow.widget_post_scenes.return }}
         - ${{ workflow.map_widget.return }}
+        - ${{ workflow.widget_severity_area_chart.return }}
+        - ${{ workflow.widget_dnbr_histogram.return }}
       time_range: ~
 
 task-instance-defaults:

@@ -417,6 +417,44 @@
       "required": [],
       "type": "object",
       "title": "Severity Layer"
+    },
+    "severity_area_chart": {
+      "additionalProperties": false,
+      "properties": {
+        "layout_kwargs": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/LayoutStyle"
+            }
+          ],
+          "default": null,
+          "title": "Layout Kwargs",
+          "description": "Additional kwargs passed to plotly.go.Figure(layout).",
+          "ecoscope:advanced": true
+        }
+      },
+      "required": [],
+      "type": "object",
+      "title": "Severity Area Chart"
+    },
+    "dnbr_histogram": {
+      "additionalProperties": false,
+      "properties": {
+        "layout_kwargs": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/LayoutStyle"
+            }
+          ],
+          "default": null,
+          "title": "Layout Kwargs",
+          "description": "Additional kwargs passed to plotly.go.Figure(layout).",
+          "ecoscope:advanced": true
+        }
+      },
+      "required": [],
+      "type": "object",
+      "title": "dNBR Histogram"
     }
   },
   "$defs": {
@@ -444,6 +482,117 @@
         "name"
       ],
       "title": "GoogleEarthEngineConnection",
+      "type": "object"
+    },
+    "AxisStyle": {
+      "properties": {
+        "title": {
+          "default": null,
+          "ecoscope:advanced": true,
+          "title": "Title",
+          "type": "string"
+        },
+        "range": {
+          "default": null,
+          "ecoscope:advanced": true,
+          "items": {
+            "type": "number"
+          },
+          "title": "Range",
+          "type": "array"
+        }
+      },
+      "title": "AxisStyle",
+      "type": "object"
+    },
+    "LayoutStyle": {
+      "properties": {
+        "font_size": {
+          "default": null,
+          "ecoscope:advanced": true,
+          "title": "Font Size",
+          "type": "number"
+        },
+        "font_color": {
+          "default": null,
+          "ecoscope:advanced": true,
+          "title": "Font Color",
+          "type": "string"
+        },
+        "font_style": {
+          "default": null,
+          "ecoscope:advanced": true,
+          "title": "Font Style",
+          "type": "string"
+        },
+        "plot_bgcolor": {
+          "default": null,
+          "ecoscope:advanced": true,
+          "title": "Plot Bgcolor",
+          "type": "string"
+        },
+        "showlegend": {
+          "default": null,
+          "ecoscope:advanced": true,
+          "title": "Showlegend",
+          "type": "boolean"
+        },
+        "hovermode": {
+          "default": null,
+          "ecoscope:advanced": true,
+          "title": "Hovermode",
+          "type": "string"
+        },
+        "legend_title": {
+          "default": null,
+          "ecoscope:advanced": true,
+          "title": "Legend Title",
+          "type": "string"
+        },
+        "title": {
+          "default": null,
+          "ecoscope:advanced": true,
+          "title": "Title",
+          "type": "string"
+        },
+        "title_x": {
+          "default": null,
+          "ecoscope:advanced": true,
+          "ge": 0.0,
+          "le": 1.0,
+          "title": "Title X",
+          "type": "number"
+        },
+        "title_y": {
+          "default": null,
+          "ecoscope:advanced": true,
+          "ge": 0.0,
+          "le": 1.0,
+          "title": "Title Y",
+          "type": "number"
+        },
+        "xaxis": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/AxisStyle"
+            }
+          ],
+          "default": null,
+          "ecoscope:advanced": true,
+          "title": "Xaxis"
+        },
+        "yaxis": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/AxisStyle"
+            }
+          ],
+          "default": null,
+          "ecoscope:advanced": true,
+          "title": "Yaxis"
+        }
+      },
+      "title": "LayoutStyle",
       "type": "object"
     }
   },
@@ -475,7 +624,9 @@
       "controlled_burn_event_type",
       "firms_event_type",
       "severity_result",
-      "severity_layer"
+      "severity_layer",
+      "severity_area_chart",
+      "dnbr_histogram"
     ]
   },
   "additionalProperties": false
