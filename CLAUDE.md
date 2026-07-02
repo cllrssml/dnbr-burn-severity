@@ -364,3 +364,27 @@ in sibling repos `fire-severity-dnbr` and `burn-scar-mapping`).
   at ~0.28 to confirm the false-positive area drops while the 8 real-looking patches survive.
 - If possible, also re-run with a narrower, real fire-date window instead of a calendar month.
 - Then share the published repo URL with Britt.
+
+## Deferred: threshold-sensitivity curve chart (decided 2026-07-02)
+
+A 4th dashboard chart — burned area (ha) as a function of `dnbr_threshold` swept across
+its 0.10–0.50 range — was scoped alongside the 3 charts shipped in v4.0.0/v5.1.0
+(Burned Area by Severity Class, dNBR Distribution, Confirmed vs. Probable). **User chose
+to skip it for now** (2026-07-02) rather than pay its cost. Real constraint, not just
+extra effort: `severity_result` only contains polygons that already passed the *current*
+threshold — sub-threshold pixels are discarded on the GEE side (`.selfMask()`) before
+`reduceToVectors`, so the data needed for a sensitivity curve isn't recoverable from the
+existing output. Building it needs one of:
+1. A `ee.Reducer.histogram()` call added inside `compute_dnbr_severity` itself (cheap —
+   reuses the already-built `dnbr` image, no re-fetch) — but changes what that task
+   returns, which every downstream consumer (map layer, all stat tasks, GeoJSON export,
+   the 3 new charts) currently assumes is a plain one-row-per-polygon table. Real
+   refactor of established, tested code, not a quick add.
+2. A separate task that recomposites from scratch — architecturally clean, but doubles
+   GEE compute time/cost on every run just for this one chart (GEE image objects can't
+   cross task boundaries in this framework, so there's no way to reuse the first task's
+   in-progress computation from a second task).
+Revisit if it turns out to matter after a few more real runs — diagnosing a run showing
+the Trap 30 false-positive pattern (dNBR histogram, confirmed-rate chart both looking
+suspicious) still works fine with what's shipped; this would only replace "raise
+`dnbr_threshold` and re-run to see" with a single-run visual.
