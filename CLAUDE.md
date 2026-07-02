@@ -6,8 +6,11 @@ Merges the two earlier fire workflows into one: AOI + date-window input (from
 `fire-severity-dnbr`) + a Sentinel-2 / Landsat sensor switch. Built for Britt
 Klaassen to test (community NBR workflow request, June 2026).
 
-**The two source workflows are intentionally left intact** — this is a new,
-third workflow, not a replacement.
+**Update 2026-07-02: both source repos (`fire-severity-dnbr`, `burn-scar-mapping`) are
+now archived on GitHub** — this workflow made them redundant once the ER overlays,
+charts, and simplified form landed. They're kept public/read-only for reference (each
+README now points here) rather than deleted or made private. Local folders under
+`~/Ecoscope_Projects/` are also untouched, just no longer the active development target.
 
 Custom package: `dnbr-severity-tasks` (module `dnbr_severity_tasks`), bundled
 into the compiled dir after each compile.
