@@ -28,6 +28,9 @@ from dnbr_severity_tasks import get_percent_burned as get_percent_burned
 from dnbr_severity_tasks import parse_fire_end_datetime as parse_fire_end_datetime
 from dnbr_severity_tasks import parse_fire_start_datetime as parse_fire_start_datetime
 from dnbr_severity_tasks import (
+    prepare_confidence_chart_data as prepare_confidence_chart_data,
+)
+from dnbr_severity_tasks import (
     prepare_dnbr_histogram_data as prepare_dnbr_histogram_data,
 )
 from dnbr_severity_tasks import (
@@ -1286,6 +1289,102 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
         .call()
     )
 
+    confidence_chart_data = (
+        task(prepare_confidence_chart_data)
+        .validate()
+        .set_task_instance_id("confidence_chart_data")
+        .handle_errors()
+        .with_tracing()
+        .skipif(
+            conditions=[
+                any_is_empty_df,
+                any_dependency_skipped,
+            ],
+            unpack_depth=1,
+        )
+        .partial(
+            geodataframe=severity_result, **(params.get("confidence_chart_data") or {})
+        )
+        .call()
+    )
+
+    confidence_chart = (
+        task(draw_bar_chart)
+        .validate()
+        .set_task_instance_id("confidence_chart")
+        .handle_errors()
+        .with_tracing()
+        .skipif(
+            conditions=[
+                any_is_empty_df,
+                any_dependency_skipped,
+            ],
+            unpack_depth=1,
+        )
+        .partial(
+            dataframe=confidence_chart_data,
+            category="severity_class",
+            bar_chart_configs=[
+                {
+                    "column": "confirmed_area_ha",
+                    "agg_func": "sum",
+                    "label": "Confirmed",
+                },
+                {"column": "probable_area_ha", "agg_func": "sum", "label": "Probable"},
+            ],
+            layout_kwargs={
+                "showlegend": True,
+                "xaxis": {"title": "Severity Class"},
+                "yaxis": {"title": "Area (ha)"},
+            },
+            **(params.get("confidence_chart") or {}),
+        )
+        .call()
+    )
+
+    confidence_chart_url = (
+        task(persist_text)
+        .validate()
+        .set_task_instance_id("confidence_chart_url")
+        .handle_errors()
+        .with_tracing()
+        .skipif(
+            conditions=[
+                any_is_empty_df,
+                any_dependency_skipped,
+            ],
+            unpack_depth=1,
+        )
+        .partial(
+            root_path=os.environ["ECOSCOPE_WORKFLOWS_RESULTS"],
+            filename_suffix="confidence_chart",
+            text=confidence_chart,
+            **(params.get("confidence_chart_url") or {}),
+        )
+        .call()
+    )
+
+    widget_confidence_chart = (
+        task(create_plot_widget_single_view)
+        .validate()
+        .set_task_instance_id("widget_confidence_chart")
+        .handle_errors()
+        .with_tracing()
+        .skipif(
+            conditions=[
+                any_is_empty_df,
+                any_dependency_skipped,
+            ],
+            unpack_depth=1,
+        )
+        .partial(
+            title="MIRBI Confirmed vs. Probable by Severity Class",
+            data=confidence_chart_url,
+            **(params.get("widget_confidence_chart") or {}),
+        )
+        .call()
+    )
+
     dashboard = (
         task(gather_dashboard)
         .validate()
@@ -1312,6 +1411,7 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
                 map_widget,
                 widget_severity_area_chart,
                 widget_dnbr_histogram,
+                widget_confidence_chart,
             ],
             time_range=None,
             **(params.get("dashboard") or {}),

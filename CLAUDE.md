@@ -75,6 +75,28 @@ also accepts optional `controlled_burn_layer`/`firms_layer`) →
 stat chain: burned_area → high_severity → (aoi_area → percent_burned) → threshold → mean_dnbr → pre_scenes → post_scenes →
 `gather_dashboard` (`time_range: ~`).
 
+### Third chart: Confirmed vs. Probable by severity class — v5.1.0, added 2026-07-02
+
+Widget 10, full-width row (`y=30`). Same `prepare_*_chart_data` → `draw_bar_chart` →
+`persist_text` → `create_plot_widget_single_view` pattern as the other two.
+
+- **Two-series grouped bars via one dataframe pivoted wide**, not native
+  stacking — `draw_bar_chart`'s `layout_kwargs` type is `LayoutStyle`, which has no
+  `barmode` field (only `BarLayoutStyle`, a *different*, unused subclass, adds
+  `bargap`/`bargroupgap` — `draw_bar_chart` doesn't accept it). `bar_chart()`'s own
+  groupby-per-BarConfig only aggregates one column per series, so getting
+  "Confirmed" and "Probable" as two comparable series meant the prep task
+  zeroing out `confirmed_area_ha` on every probable row and vice versa, then
+  passing both columns as separate `bar_chart_configs` entries — summing each
+  column within the groupby naturally recovers the per-class confirmed/probable
+  split. Renders as grouped (side-by-side) bars, not stacked — plotly's default
+  with no `barmode` override, and reads fine either way for a 2-series comparison.
+- **Framing matters more than the mechanics here** — see the CLAUDE.md incident
+  write-up (Trap 30) and the task's own docstring: a uniformly high "confirmed"
+  rate across every severity class, including Low, is not fire evidence — it's the
+  same seasonal-drying signature this workflow already got burned by once. This
+  chart is a corroboration-rate view, not a truth detector.
+
 ### Hide chart layout_kwargs — v5.0.0, added 2026-07-02
 
 The "Severity Area Chart" and "dNBR Histogram" sections (each exposing a single

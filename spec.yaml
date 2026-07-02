@@ -547,11 +547,54 @@ workflow:
       title: "dNBR Distribution"
       data: ${{ workflow.dnbr_histogram_url.return }}
 
+  # --- Chart: MIRBI confirmed vs. probable area by severity class --------------
+  - name: Confidence Chart Data
+    id: confidence_chart_data
+    task: prepare_confidence_chart_data
+    partial:
+      geodataframe: ${{ workflow.severity_result.return }}
+
+  - name: Confidence Chart
+    id: confidence_chart
+    task: draw_bar_chart
+    partial:
+      dataframe: ${{ workflow.confidence_chart_data.return }}
+      category: severity_class
+      bar_chart_configs:
+        - column: confirmed_area_ha
+          agg_func: sum
+          label: "Confirmed"
+        - column: probable_area_ha
+          agg_func: sum
+          label: "Probable"
+      layout_kwargs:
+        showlegend: true
+        xaxis:
+          title: "Severity Class"
+        yaxis:
+          title: "Area (ha)"
+
+  - name: Persist Confidence Chart
+    id: confidence_chart_url
+    task: persist_text
+    partial:
+      root_path: ${{ env.ECOSCOPE_WORKFLOWS_RESULTS }}
+      filename_suffix: confidence_chart
+      text: ${{ workflow.confidence_chart.return }}
+
+  - name: Confidence Chart Widget
+    id: widget_confidence_chart
+    task: create_plot_widget_single_view
+    partial:
+      title: "MIRBI Confirmed vs. Probable by Severity Class"
+      data: ${{ workflow.confidence_chart_url.return }}
+
   # --- Dashboard --------------------------------------------------------------
   # Row 1 (y=0): 0=Burned, 1=High Sev, 2=% Burned, 3=Threshold
   # Row 2 (y=3): 4=Mean dNBR, 5=Pre Imgs, 6=Post Imgs
   # Row 3 (y=6): 7=Map
   # Row 4 (y=22): 8=Area by Severity Class chart, 9=dNBR Histogram
+  # Row 5 (y=30): 10=Confirmed vs Probable chart
   - name: Dashboard
     id: dashboard
     task: gather_dashboard
@@ -568,6 +611,7 @@ workflow:
         - ${{ workflow.map_widget.return }}
         - ${{ workflow.widget_severity_area_chart.return }}
         - ${{ workflow.widget_dnbr_histogram.return }}
+        - ${{ workflow.widget_confidence_chart.return }}
       time_range: ~
 
 task-instance-defaults:

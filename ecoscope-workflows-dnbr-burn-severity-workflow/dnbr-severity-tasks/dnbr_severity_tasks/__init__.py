@@ -977,3 +977,31 @@ def prepare_dnbr_histogram_data(geodataframe: _GDF) -> _GDF:
         edges = [lo, lo + bin_width]
     bins = pd.cut(values, bins=edges, right=False, labels=edges[:-1])
     return pd.DataFrame({"dnbr_bin": bins.astype(int), "dNBR": values})
+
+
+@register(tags=["fire", "stats"])
+def prepare_confidence_chart_data(geodataframe: _GDF) -> _GDF:
+    """
+    One row per burned polygon: ordinal-prefixed severity_class plus area_ha split
+    into confirmed_area_ha / probable_area_ha (whichever doesn't match that row's own
+    `confidence` is zeroed), so draw_bar_chart's per-column sum-by-category gives the
+    confirmed and probable area totals per severity class as two side-by-side series.
+
+    Reminder (see CLAUDE.md Trap 30): a high 'confirmed' share is NOT proof of real
+    fire — MIRBI is also sensitive to seasonal vegetation drying. Read this chart as
+    "how much of each class the dual-index check corroborates," not as a fire/no-fire
+    verdict. A uniformly high confirmed rate across every class, including Low, is the
+    same seasonal-drying signature the dNBR histogram is meant to catch.
+    """
+    cols = ["severity_class", "confirmed_area_ha", "probable_area_ha"]
+    if geodataframe.empty:
+        return pd.DataFrame(columns=cols)
+    order = {name: i + 1 for i, name in enumerate(_BURNED_NAMES)}
+    out = geodataframe[["severity_class", "area_ha", "confidence"]].copy()
+    out["severity_class"] = out["severity_class"].map(
+        lambda c: f"{order.get(c, 0)}. {c}"
+    )
+    is_confirmed = out["confidence"] == "confirmed"
+    out["confirmed_area_ha"] = out["area_ha"].where(is_confirmed, 0.0)
+    out["probable_area_ha"] = out["area_ha"].where(~is_confirmed, 0.0)
+    return out[cols]
