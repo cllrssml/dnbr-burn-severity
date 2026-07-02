@@ -653,6 +653,13 @@ def create_styled_overlay_layer(
     width = 2.0
     layers = []
     legend = LegendDefinition(labels=[legend_label], colors=[color]) if legend_label else None
+    # deck.gl only hit-tests what it actually draws: an unfilled (`filled=False`) polygon
+    # has no interior in the render/picking buffer, so hover only registers on the thin
+    # stroke line — in practice the tooltip never fires. Points don't have this problem
+    # (they're always "filled"). Only add a (near-invisible) fill when this layer actually
+    # has something to show on hover, so plain outline-only layers (AOI boundary, the
+    # free-text overlay) keep their original look.
+    interactive = bool(tooltip_columns) or legend_label is not None
 
     def _next_legend():
         # Attach the legend to only the first sub-layer that gets built.
@@ -675,12 +682,21 @@ def create_styled_overlay_layer(
 
     polygon_gdf = gdf[geom_col.isin({"Polygon", "MultiPolygon"})].copy()
     if not polygon_gdf.empty:
-        layers.append(LayerDefinition(
-            geodataframe=polygon_gdf,
-            layer_style=PolygonLayerStyle(
+        if interactive:
+            rgb = [int(color[i:i + 2], 16) for i in (1, 3, 5)]
+            polygon_style = PolygonLayerStyle(
+                filled=True, stroked=True,
+                get_fill_color=rgb + [40],  # low-alpha fill: pickable without obscuring the map
+                get_line_color=color, get_line_width=width, line_width_units="pixels",
+            )
+        else:
+            polygon_style = PolygonLayerStyle(
                 filled=False, stroked=True,
                 get_line_color=color, get_line_width=width, line_width_units="pixels",
-            ),
+            )
+        layers.append(LayerDefinition(
+            geodataframe=polygon_gdf,
+            layer_style=polygon_style,
             legend=_next_legend(),
             tooltip_columns=_cols(polygon_gdf),
             zoom=zoom,

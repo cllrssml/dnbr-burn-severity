@@ -75,6 +75,22 @@ also accepts optional `controlled_burn_layer`/`firms_layer`) →
 stat chain: burned_area → high_severity → (aoi_area → percent_burned) → threshold → mean_dnbr → pre_scenes → post_scenes →
 `gather_dashboard` (`time_range: ~`).
 
+### Fix: polygon tooltips never fired — v3.2.0, added 2026-07-02
+
+Real bug found via live testing: FIRMS point tooltips worked, Controlled Burn polygon
+tooltips did not. Root cause is a deck.gl picking quirk, not a workflow logic bug —
+`PolygonLayerStyle(filled=False, ...)` (used for outline-only overlays like the AOI
+boundary) means deck.gl never draws/rasterizes the polygon interior, and picking
+piggybacks on that same draw pass. So an unfilled polygon can only register a hover hit
+on the thin stroke line, which in practice is nearly impossible to land a cursor on —
+looks exactly like "no tooltip." Points don't have this problem; a point marker is
+always "filled." **Fix:** `create_styled_overlay_layer` now switches to
+`filled=True` with a low-alpha fill (`get_fill_color=[r, g, b, 40]`, alpha 40/255 ≈ 16%)
+whenever the layer actually has `tooltip_columns` or a `legend_label` set — i.e. only
+for layers meant to be interactive. Plain outline-only layers (AOI boundary, the
+free-text overlay) are untouched (`interactive` is `False` for both, since neither
+passes tooltip/legend params), so their appearance doesn't change.
+
 ### Tooltips, legend, area, and consistent hectares — v3.1.0, added 2026-07-02
 
 - **Tooltips on the ER event overlays.** `create_styled_overlay_layer` gained
