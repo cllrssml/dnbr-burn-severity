@@ -75,6 +75,29 @@ also accepts optional `controlled_burn_layer`/`firms_layer`) →
 stat chain: burned_area → high_severity → (aoi_area → percent_burned) → threshold → mean_dnbr → pre_scenes → post_scenes →
 `gather_dashboard` (`time_range: ~`).
 
+### Fix: burn polygon's low-alpha fill blocked the severity tooltip — v3.3.0, added 2026-07-02
+
+Live-tested regression from v3.2.0: fixing the Controlled Burn tooltip (by making its
+polygon `filled=True`, see below) meant that polygon's fill now sat in the picking
+buffer on top of `severity_layer` wherever they overlapped — hovering inside the burn
+scar returned the Controlled Burn tooltip and the dNBR severity tooltip became
+unreachable in that whole region. User's own instinct was "bring dNBR on top," but a
+flat reorder trades one bug for another: severity's fill is ~85% opaque, so on top it
+would visually erase the blue burn outline wherever they overlap — losing the "where's
+the recorded burn relative to the detected severity" reference the overlay exists for.
+
+**Fix: split each interactive polygon into two layers instead of one.**
+`create_styled_overlay_layer` now returns `{"below": [...], "above": [...]}` instead of
+a flat list — "below" holds the pickable low-alpha fill (tooltip source), "above" holds
+a `pickable=False` visible-outline-only decorative copy of the same polygon.
+`combine_severity_layers` places `severity_layer` between the two buckets from every
+overlay (AOI, free-text overlay, controlled burn, FIRMS), so: the outline is always
+visible on top (nothing changed there), severity's tooltip always wins in the overlap
+(the "above" outline can't intercept hover — it's explicitly non-pickable), and the burn
+polygon's own tooltip still fires wherever it's exposed outside the severity footprint.
+Non-interactive layers (AOI boundary, free-text overlay) are unaffected — they only ever
+populate "above", identical to their pre-v3.2.0 single-layer behaviour.
+
 ### Fix: polygon tooltips never fired — v3.2.0, added 2026-07-02
 
 Real bug found via live testing: FIRMS point tooltips worked, Controlled Burn polygon

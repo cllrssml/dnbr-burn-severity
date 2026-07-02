@@ -639,6 +639,15 @@ def create_styled_overlay_layer(
     Splits by geometry type so lonboard never receives mixed types. The legend entry
     (if any) is attached to only the first non-empty sub-layer, so a mixed-geometry
     input still produces one legend swatch, not one per geometry type.
+
+    Returns `{"below": [...], "above": [...]}`, not a flat list. For an interactive
+    polygon (tooltip_columns or legend_label set), the pickable low-alpha fill goes in
+    "below" and a non-pickable visible outline goes in "above" — combine_severity_layers
+    places severity_layer between the two, so a hover over the interior always reaches
+    the dNBR tooltip first (the outline can't intercept it, being non-pickable), while
+    the outline itself stays visible on top everywhere, including over severity polygons.
+    Everything else (points, lines, non-interactive polygons) goes straight into "above",
+    matching the original single-layer behaviour.
     """
     from ecoscope.platform.tasks.results._ecomap import (
         LayerDefinition,
@@ -651,7 +660,7 @@ def create_styled_overlay_layer(
     gdf = geodataframe.copy()
     geom_col = gdf.geometry.geom_type
     width = 2.0
-    layers = []
+    below, above = [], []
     legend = LegendDefinition(labels=[legend_label], colors=[color]) if legend_label else None
     # deck.gl only hit-tests what it actually draws: an unfilled (`filled=False`) polygon
     # has no interior in the render/picking buffer, so hover only registers on the thin
@@ -672,7 +681,7 @@ def create_styled_overlay_layer(
 
     line_gdf = gdf[geom_col.isin({"LineString", "MultiLineString"})].copy()
     if not line_gdf.empty:
-        layers.append(LayerDefinition(
+        above.append(LayerDefinition(
             geodataframe=line_gdf,
             layer_style=PolylineLayerStyle(get_color=color, get_width=width, width_units="pixels", cap_rounded=True),
             legend=_next_legend(),
@@ -684,27 +693,42 @@ def create_styled_overlay_layer(
     if not polygon_gdf.empty:
         if interactive:
             rgb = [int(color[i:i + 2], 16) for i in (1, 3, 5)]
-            polygon_style = PolygonLayerStyle(
-                filled=True, stroked=True,
-                get_fill_color=rgb + [40],  # low-alpha fill: pickable without obscuring the map
-                get_line_color=color, get_line_width=width, line_width_units="pixels",
-            )
+            below.append(LayerDefinition(
+                geodataframe=polygon_gdf,
+                layer_style=PolygonLayerStyle(
+                    filled=True, stroked=False,
+                    get_fill_color=rgb + [40],  # low-alpha fill: pickable, sits under severity
+                ),
+                legend=None,
+                tooltip_columns=_cols(polygon_gdf),
+                zoom=False,  # the visible outline (below) is the zoom target, not this fill
+            ))
+            above.append(LayerDefinition(
+                geodataframe=polygon_gdf,
+                layer_style=PolygonLayerStyle(
+                    filled=False, stroked=True,
+                    get_line_color=color, get_line_width=width, line_width_units="pixels",
+                    pickable=False,  # decorative only — never intercepts hover from severity
+                ),
+                legend=_next_legend(),
+                tooltip_columns=[],
+                zoom=zoom,
+            ))
         else:
-            polygon_style = PolygonLayerStyle(
-                filled=False, stroked=True,
-                get_line_color=color, get_line_width=width, line_width_units="pixels",
-            )
-        layers.append(LayerDefinition(
-            geodataframe=polygon_gdf,
-            layer_style=polygon_style,
-            legend=_next_legend(),
-            tooltip_columns=_cols(polygon_gdf),
-            zoom=zoom,
-        ))
+            above.append(LayerDefinition(
+                geodataframe=polygon_gdf,
+                layer_style=PolygonLayerStyle(
+                    filled=False, stroked=True,
+                    get_line_color=color, get_line_width=width, line_width_units="pixels",
+                ),
+                legend=_next_legend(),
+                tooltip_columns=_cols(polygon_gdf),
+                zoom=zoom,
+            ))
 
     point_gdf = gdf[geom_col.isin({"Point", "MultiPoint"})].copy()
     if not point_gdf.empty:
-        layers.append(LayerDefinition(
+        above.append(LayerDefinition(
             geodataframe=point_gdf,
             layer_style=PointLayerStyle(get_fill_color=color, get_radius=5, radius_units="pixels"),
             legend=_next_legend(),
@@ -712,7 +736,7 @@ def create_styled_overlay_layer(
             zoom=zoom,
         ))
 
-    return layers
+    return {"below": below, "above": above}
 
 
 @register(tags=["fire", "overlay"])
@@ -749,19 +773,33 @@ def combine_severity_layers(
     overlay_layer / controlled_burn_layer / firms_layer are all optional — pass
     SkipSentinel or None to omit any of them. Handles SkipSentinel internally so the
     map renders even when one or more overlays are blank.
+
+    Each overlay is now `{"below": [...], "above": [...]}` from create_styled_overlay_layer
+    (or a plain list, for backwards compatibility). "below" layers (a pickable overlay
+    fill, if any) are placed BEFORE severity_layer so severity's own tooltip always wins
+    when hovering inside an overlapping overlay polygon; "above" layers (visible outlines,
+    points, lines — all non-pickable where they'd otherwise compete with severity) are
+    placed after, so they stay visible on top without blocking the severity tooltip.
     """
     from wt_task.skip import SkipSentinel
 
     if isinstance(severity_layer, SkipSentinel):
         return severity_layer
-    layers = [severity_layer]
-    for extra in (aoi_layer, overlay_layer, controlled_burn_layer, firms_layer):
+
+    def _split(extra):
         if isinstance(extra, SkipSentinel) or extra is None:
-            continue
-        if isinstance(extra, list):
-            layers.extend(extra)
-        else:
-            layers.append(extra)
+            return [], []
+        if isinstance(extra, dict):
+            return extra.get("below", []), extra.get("above", [])
+        return [], (extra if isinstance(extra, list) else [extra])
+
+    overlays = (aoi_layer, overlay_layer, controlled_burn_layer, firms_layer)
+    layers = []
+    for extra in overlays:
+        layers.extend(_split(extra)[0])
+    layers.append(severity_layer)
+    for extra in overlays:
+        layers.extend(_split(extra)[1])
     return layers
 
 
