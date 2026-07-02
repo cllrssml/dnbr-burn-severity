@@ -1,0 +1,45 @@
+{
+  "workflow_details": {
+    "name": "dNBR Burn Severity",
+    "description": "Burn-severity map (dNBR) across an EarthRanger area of interest for a chosen fire window, using Sentinel-2 or Landsat."
+  },
+  "er_connection": {
+    "data_source": {
+      "name": "<your-data-source>"
+    }
+  },
+  "gee_connection": {
+    "data_source": {
+      "name": "<your-gee-connection>"
+    }
+  },
+  "aoi_name": {
+    "group_name": "<your-aoi-group>"
+  },
+  "overlay_name": {
+    "group_name": ""
+  },
+  "base_maps": {
+    "base_maps": [
+      {
+        "url": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}",
+        "opacity": 1
+      },
+      {
+        "url": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        "opacity": 0.5
+      }
+    ]
+  },
+  "severity_result": {
+    "fire_start_date": "2024-08-01",
+    "fire_end_date": "2024-08-10",
+    "satellite": "Sentinel-2",
+    "pre_fire_days": 90,
+    "post_fire_days": 30,
+    "scale": 100
+  },
+  "severity_layer": {
+    "opacity": 0.85
+  }
+}

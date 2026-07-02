@@ -1,0 +1,15 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "dnbr-severity-tasks"
+version = "0.1.0"
+description = "Custom tasks for the dNBR Burn Severity workflow on the Ecoscope Platform"
+dependencies = ["geopandas", "numpy", "wt-registry>=0.2,<1", "shapely"]
+
+[project.entry-points."wt_registry"]
+dnbr_severity_tasks = "dnbr_severity_tasks"
+
+[tool.hatch.build.targets.wheel]
+packages = ["dnbr_severity_tasks"]
